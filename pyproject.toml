@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bcs-anki"
+version = "0.1.0"
+description = "BCS-to-Anki flashcard generator CLI tool"
+authors = [{ name = "User" }]
+requires-python = ">=3.10"
+dependencies = [
+    "click>=8.1",
+    "pyyaml>=6.0",
+    "requests>=2.31",
+    "python-dotenv>=1.0",
+]
+
+[project.scripts]
+bcs-anki = "bcs_anki.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+

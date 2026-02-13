@@ -1,0 +1,99 @@
+2026-02-13 11:00:20 | INFO     | bcs_anki.progress | Read 44 unique words from words.txt
+2026-02-13 11:00:20 | INFO     | bcs_anki.processor | Processing 44 words...
+2026-02-13 11:00:20 | INFO     | bcs_anki.processor | [1/44] Processing: Slatkorečivost
+2026-02-13 11:00:20 | INFO     | bcs_anki.processing | [Slatkorečivost] generating definition: ✓
+2026-02-13 11:00:26 | INFO     | bcs_anki.processing | [Slatkorečivost] definition generated: ✓ - canonical: slatkorečivost
+2026-02-13 11:00:26 | INFO     | bcs_anki.processing | [Slatkorečivost] generating sentences: ✓
+2026-02-13 11:00:29 | INFO     | bcs_anki.processing | [Slatkorečivost] sentences generated: ✓
+2026-02-13 11:00:29 | INFO     | bcs_anki.processing | [Slatkorečivost] deciding image type: ✓
+2026-02-13 11:00:33 | INFO     | bcs_anki.llm | Image type decision for 'Slatkorečivost': ai (translation: sweet-talking, reason: The word 'slatkorečivost' refers to an abstract concept of speaking in a charming or persuasive manner. It involves an emotional and metaphorical quality that cannot be captured by a stock photo of a physical object. An AI-generated image can creatively interpret the nuances of this concept.)
+2026-02-13 11:00:33 | INFO     | bcs_anki.processing | [Slatkorečivost] generating image prompt: ✓
+2026-02-13 11:00:41 | INFO     | bcs_anki.llm | Generated image prompt for 'Slatkorečivost': style=Expressive, painterly style, rationale=This approach uses warm colors and symbolic imagery, such as flowers and butterflies, to convey the pleasant and captivating nature of 'slatkorečivost'. The setting and expressions help learners visualize the concept of speaking in an endearing and engaging manner, making it easier to remember the word.
+2026-02-13 11:00:41 | INFO     | bcs_anki.images | Generated image prompt
+2026-02-13 11:00:41 | INFO     | bcs_anki.processing | [Slatkorečivost] getting image (ai): ✓
+2026-02-13 11:00:41 | INFO     | bcs_anki.images | Generating AI image for 'slatkorečivost' with prompt: Create an expressive and painterly image depicting a charming and charismatic person speaking with a...
+2026-02-13 11:01:01 | INFO     | bcs_anki.images | Saved AI-generated image to temp_images/slatkorečivost_c3b081.png
+2026-02-13 11:01:01 | INFO     | bcs_anki.processing | [Slatkorečivost] image obtained: ✓ - file: slatkorečivost_c3b081.png
+2026-02-13 11:01:01 | INFO     | bcs_anki.processing | [Slatkorečivost] complete: ✓ - all cards generated
+2026-02-13 11:01:01 | INFO     | bcs_anki.csv_generator | Wrote 3 cards for 'slatkorečivost' to CSV
+2026-02-13 11:01:01 | DEBUG    | bcs_anki.progress | Marked 'Slatkorečivost' as completed
+2026-02-13 11:01:03 | INFO     | bcs_anki.processor | [2/44] Processing: Sudjeluje
+2026-02-13 11:01:03 | INFO     | bcs_anki.processing | [Sudjeluje] generating definition: ✓
+2026-02-13 11:01:06 | INFO     | bcs_anki.processing | [Sudjeluje] definition generated: ✓ - canonical: sudjelovati
+2026-02-13 11:01:06 | INFO     | bcs_anki.processing | [Sudjeluje] generating sentences: ✓
+2026-02-13 11:01:08 | INFO     | bcs_anki.processing | [Sudjeluje] sentences generated: ✓
+2026-02-13 11:01:08 | INFO     | bcs_anki.processing | [Sudjeluje] deciding image type: ✓
+2026-02-13 11:01:12 | INFO     | bcs_anki.llm | Image type decision for 'Sudjeluje': ai (translation: participate, reason: The word 'sudjelovati' is a verb that describes the action of participating, which is an abstract concept that involves interaction and engagement in activities or events. This requires creative interpretation to visually represent the dynamic and varied nature of participation.)
+2026-02-13 11:01:12 | INFO     | bcs_anki.processing | [Sudjeluje] generating image prompt: ✓
+2026-02-13 11:01:17 | INFO     | bcs_anki.llm | Generated image prompt for 'Sudjeluje': style=Dynamic illustration, rationale=This approach uses a culturally relevant and engaging setting to depict the concept of 'sudjelovati,' meaning to participate. By showing a familiar community scene with active involvement, learners can easily associate the word with collective participation, making the concept memorable and relatable.
+2026-02-13 11:01:17 | INFO     | bcs_anki.images | Generated image prompt
+2026-02-13 11:01:17 | INFO     | bcs_anki.processing | [Sudjeluje] getting image (ai): ✓
+2026-02-13 11:01:17 | INFO     | bcs_anki.images | Generating AI image for 'sudjelovati' with prompt: A dynamic illustration showing a diverse group of people from the Balkans actively participating in ...
+2026-02-13 11:01:42 | INFO     | bcs_anki.images | Saved AI-generated image to temp_images/sudjelovati_2bbb49.png
+2026-02-13 11:01:42 | INFO     | bcs_anki.processing | [Sudjeluje] image obtained: ✓ - file: sudjelovati_2bbb49.png
+2026-02-13 11:01:42 | INFO     | bcs_anki.processing | [Sudjeluje] complete: ✓ - all cards generated
+2026-02-13 11:01:42 | INFO     | bcs_anki.csv_generator | Wrote 3 cards for 'sudjelovati' to CSV
+2026-02-13 11:01:42 | DEBUG    | bcs_anki.progress | Marked 'Sudjeluje' as completed
+2026-02-13 11:01:44 | INFO     | bcs_anki.processor | [3/44] Processing: Primirje
+2026-02-13 11:01:44 | INFO     | bcs_anki.processing | [Primirje] generating definition: ✓
+2026-02-13 11:01:47 | INFO     | bcs_anki.processing | [Primirje] definition generated: ✓ - canonical: primirje
+2026-02-13 11:01:47 | INFO     | bcs_anki.processing | [Primirje] generating sentences: ✓
+2026-02-13 11:01:49 | INFO     | bcs_anki.processing | [Primirje] sentences generated: ✓
+2026-02-13 11:01:49 | INFO     | bcs_anki.processing | [Primirje] deciding image type: ✓
+2026-02-13 11:02:02 | INFO     | bcs_anki.llm | Image type decision for 'Primirje': ai (translation: truce, reason: The word 'primirje' refers to a temporary cessation of hostilities, which is an abstract concept involving negotiation and peace agreements. It is not a physical object that can be easily photographed, thus requiring creative interpretation to visually represent the idea of a truce.)
+2026-02-13 11:02:02 | INFO     | bcs_anki.processing | [Primirje] generating image prompt: ✓
+2026-02-13 11:02:07 | INFO     | bcs_anki.llm | Generated image prompt for 'Primirje': style=Painterly, with soft and warm color tones, rationale=This approach uses symbolic and cultural elements to visually encapsulate the concept of 'primirje'. By depicting a vivid, peaceful interaction amidst a historically significant setting, learners can connect the image with the concept of a temporary truce. The use of contrasting elements (historic vs. modern, peaceful interaction vs. remnants of battle) highlights the notion of a ceasefire, making the word memorable and culturally relevant.
+2026-02-13 11:02:07 | INFO     | bcs_anki.images | Generated image prompt
+2026-02-13 11:02:07 | INFO     | bcs_anki.processing | [Primirje] getting image (ai): ✓
+2026-02-13 11:02:07 | INFO     | bcs_anki.images | Generating AI image for 'primirje' with prompt: Create an evocative scene on a serene battlefield at dawn, where two opposing soldiers, one in histo...
+2026-02-13 11:02:25 | INFO     | bcs_anki.images | Saved AI-generated image to temp_images/primirje_78249a.png
+2026-02-13 11:02:25 | INFO     | bcs_anki.processing | [Primirje] image obtained: ✓ - file: primirje_78249a.png
+2026-02-13 11:02:25 | INFO     | bcs_anki.processing | [Primirje] complete: ✓ - all cards generated
+2026-02-13 11:02:25 | INFO     | bcs_anki.csv_generator | Wrote 3 cards for 'primirje' to CSV
+2026-02-13 11:02:25 | DEBUG    | bcs_anki.progress | Marked 'Primirje' as completed
+2026-02-13 11:02:27 | INFO     | bcs_anki.processor | [4/44] Processing: Raspolaganje
+2026-02-13 11:02:27 | INFO     | bcs_anki.processing | [Raspolaganje] generating definition: ✓
+2026-02-13 11:02:29 | INFO     | bcs_anki.processing | [Raspolaganje] definition generated: ✓ - canonical: raspolaganje
+2026-02-13 11:02:29 | INFO     | bcs_anki.processing | [Raspolaganje] generating sentences: ✓
+2026-02-13 11:02:34 | INFO     | bcs_anki.processing | [Raspolaganje] sentences generated: ✓
+2026-02-13 11:02:34 | INFO     | bcs_anki.processing | [Raspolaganje] deciding image type: ✓
+2026-02-13 11:02:39 | INFO     | bcs_anki.llm | Image type decision for 'Raspolaganje': ai (translation: disposal or management, reason: The word 'raspolaganje' refers to an abstract concept of managing or controlling resources, which is not a concrete object that can be photographed. It involves actions and decisions, making it suitable for AI-generated imagery that can creatively interpret the concept.)
+2026-02-13 11:02:39 | INFO     | bcs_anki.processing | [Raspolaganje] generating image prompt: ✓
+2026-02-13 11:02:45 | INFO     | bcs_anki.llm | Generated image prompt for 'Raspolaganje': style=Abstract art, rationale=Abstract art allows for the representation of complex concepts like control and management without being tied to a specific literal depiction. The combination of symbolic elements like the hand and resources, along with cultural hints, provides a memorable and culturally relevant interpretation of 'raspolaganje'. This approach helps learners associate the image with the concept of managing and controlling resources.
+2026-02-13 11:02:45 | INFO     | bcs_anki.images | Generated image prompt
+2026-02-13 11:02:45 | INFO     | bcs_anki.processing | [Raspolaganje] getting image (ai): ✓
+2026-02-13 11:02:45 | INFO     | bcs_anki.images | Generating AI image for 'raspolaganje' with prompt: An abstract art piece symbolizing the concept of 'raspolaganje'. The image should portray a large, s...
+2026-02-13 11:03:07 | INFO     | bcs_anki.images | Saved AI-generated image to temp_images/raspolaganje_30532d.png
+2026-02-13 11:03:07 | INFO     | bcs_anki.processing | [Raspolaganje] image obtained: ✓ - file: raspolaganje_30532d.png
+2026-02-13 11:03:07 | INFO     | bcs_anki.processing | [Raspolaganje] complete: ✓ - all cards generated
+2026-02-13 11:03:07 | INFO     | bcs_anki.csv_generator | Wrote 3 cards for 'raspolaganje' to CSV
+2026-02-13 11:03:07 | DEBUG    | bcs_anki.progress | Marked 'Raspolaganje' as completed
+2026-02-13 11:03:09 | INFO     | bcs_anki.processor | [5/44] Processing: Izolovan
+2026-02-13 11:03:09 | INFO     | bcs_anki.processing | [Izolovan] generating definition: ✓
+2026-02-13 11:03:11 | INFO     | bcs_anki.processing | [Izolovan] definition generated: ✓ - canonical: izolovan
+2026-02-13 11:03:11 | INFO     | bcs_anki.processing | [Izolovan] generating sentences: ✓
+2026-02-13 11:03:15 | INFO     | bcs_anki.processing | [Izolovan] sentences generated: ✓
+2026-02-13 11:03:15 | INFO     | bcs_anki.processing | [Izolovan] deciding image type: ✓
+2026-02-13 11:03:19 | INFO     | bcs_anki.llm | Image type decision for 'Izolovan': ai (translation: isolated, reason: The word 'izolovan' refers to a state of being separated or isolated, which is an abstract concept. It can relate to both physical and social isolation, requiring creative interpretation to visually represent the nuanced meaning effectively.)
+2026-02-13 11:03:19 | INFO     | bcs_anki.processing | [Izolovan] generating image prompt: ✓
+2026-02-13 11:03:26 | INFO     | bcs_anki.llm | Generated image prompt for 'Izolovan': style=Painterly, expressive, rationale=This approach captures the essence of 'izolovan' by using a visual metaphor of physical isolation. The solitary figure and sparse environment evoke feelings of being cut off from others, while the culturally resonant landscape helps learners connect the image with the South Slavic context. The melancholic, expressive style enhances the emotional impact, making it memorable.
+2026-02-13 11:03:26 | INFO     | bcs_anki.images | Generated image prompt
+2026-02-13 11:03:26 | INFO     | bcs_anki.processing | [Izolovan] getting image (ai): ✓
+2026-02-13 11:03:26 | INFO     | bcs_anki.images | Generating AI image for 'izolovan' with prompt: Create an image of a solitary figure standing on a small, rocky island surrounded by calm, expansive...
+2026-02-13 11:03:40 | INFO     | bcs_anki.images | Saved AI-generated image to temp_images/izolovan_c0c6bb.png
+2026-02-13 11:03:40 | INFO     | bcs_anki.processing | [Izolovan] image obtained: ✓ - file: izolovan_c0c6bb.png
+2026-02-13 11:03:40 | INFO     | bcs_anki.processing | [Izolovan] complete: ✓ - all cards generated
+2026-02-13 11:03:40 | INFO     | bcs_anki.csv_generator | Wrote 3 cards for 'izolovan' to CSV
+2026-02-13 11:03:40 | DEBUG    | bcs_anki.progress | Marked 'Izolovan' as completed
+2026-02-13 11:03:42 | INFO     | bcs_anki.processor | [6/44] Processing: Izrazito
+2026-02-13 11:03:42 | INFO     | bcs_anki.processing | [Izrazito] generating definition: ✓
+2026-02-13 11:03:45 | INFO     | bcs_anki.processing | [Izrazito] definition generated: ✓ - canonical: izrazit
+2026-02-13 11:03:45 | INFO     | bcs_anki.processing | [Izrazito] generating sentences: ✓
+2026-02-13 11:03:48 | INFO     | bcs_anki.processing | [Izrazito] sentences generated: ✓
+2026-02-13 11:03:48 | INFO     | bcs_anki.processing | [Izrazito] deciding image type: ✓
+2026-02-13 11:03:55 | INFO     | bcs_anki.llm | Image type decision for 'Izrazito': ai (translation: distinctly, reason: The word 'izrazito' is an adverb describing something that is very noticeable, clear, or pronounced. It represents an abstract concept of degree or emphasis, which is better suited for creative interpretation through AI generation rather than a concrete stock photo.)
+2026-02-13 11:03:55 | INFO     | bcs_anki.processing | [Izrazito] generating image prompt: ✓
+2026-02-13 11:04:01 | INFO     | bcs_anki.llm | Generated image prompt for 'Izrazito': style=Abstract art, rationale=The use of abstract art with bold contrasts and vivid colors will help learners associate the word 'izrazito' with something that stands out in a clear and prominent manner. The imagery of the sun cutting through fog aligns with the word's definition, representing clarity emerging from obscurity, which is culturally relatable as the sun is a universal symbol of prominence and visibility.
+2026-02-13 11:04:01 | INFO     | bcs_anki.images | Generated image prompt
+2026-02-13 11:04:01 | INFO     | bcs_anki.processing | [Izrazito] getting image (ai): ✓
+2026-02-13 11:04:01 | INFO     | bcs_anki.images | Generating AI image for 'izrazit' with prompt: Create an abstract art scene that vividly represents the concept of 'izrazito,' emphasizing clarity ...

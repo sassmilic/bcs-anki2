@@ -1,0 +1,13 @@
+{
+  "input_file": "words.txt",
+  "total_words": 44,
+  "completed_words": [
+    "Slatkore\u010divost",
+    "Sudjeluje",
+    "Primirje",
+    "Raspolaganje",
+    "Izolovan"
+  ],
+  "failed_words": [],
+  "last_updated": "2026-02-13T11:03:40.560716"
+}
