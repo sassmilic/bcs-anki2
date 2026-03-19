@@ -64,7 +64,11 @@ def generate_definition_and_examples(cfg: AppConfig, word: str, context: str | N
         definition_part = "\n".join(lines[:1])
         examples_part = "\n".join(lines[1:])
 
-    return GeneratedText(definition_html=definition_part.strip(), examples_html=examples_part.strip())
+    definition_clean = definition_part.strip()
+    if definition_clean.startswith("DEFINICIJA:"):
+        definition_clean = definition_clean[len("DEFINICIJA:"):].strip()
+
+    return GeneratedText(definition_html=definition_clean, examples_html=examples_part.strip())
 
 
 def decide_image_source(cfg: AppConfig, word: str, context: str | None = None) -> ImageSource:

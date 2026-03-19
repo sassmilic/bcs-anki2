@@ -24,8 +24,9 @@ Zadatak:
 Format izlaza:
 DEFINICIJA:
 {{{{c1::KANONSKI_OBLIK}}}} (GRAMMATIKA)<br>
-- ako je potrebno, kratka napomena o eventualnoj grešci u pravopisu ili nedostajućim dijakritičkim znakovima ulazne riječi (npr. "Ulazna riječ je vjerovatno pogrešno napisana; kanonski oblik je ...").<br>
 – definicija u jednom ili dva kraća, jasna iskaza.
+
+VAŽNO: NE komentariši pravopis ulazne riječi. Ako je riječ pogrešno napisana, jednostavno koristi ispravan oblik bez ikakve napomene.
 
 PRIMJERI:
 1. Rečenica s {{{{c1::oblik1}}}}.<br>2. Rečenica s {{{{c1::oblik2}}}}.<br>3. Rečenica s {{{{c1::oblik3}}}}."""

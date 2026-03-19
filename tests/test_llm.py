@@ -14,7 +14,7 @@ from bcs_anki.llm import (
 
 class TestGenerateDefinitionAndExamples:
     def test_splits_on_primjeri_delimiter(self, mock_cfg, mock_openai_chat):
-        content = "{{c1::primirje}} — privremeni prekid\nPRIMJERI:\n1. Sentence one.\n2. Sentence two.\n3. Sentence three."
+        content = "DEFINICIJA:\n{{c1::primirje}} — privremeni prekid\nPRIMJERI:\n1. Sentence one.\n2. Sentence two.\n3. Sentence three."
         resp = mock_openai_chat(content)
 
         with patch("bcs_anki.llm._get_client") as mock_client:
@@ -23,6 +23,7 @@ class TestGenerateDefinitionAndExamples:
 
         assert isinstance(result, GeneratedText)
         assert "primirje" in result.definition_html
+        assert not result.definition_html.startswith("DEFINICIJA:")
         assert "Sentence one" in result.examples_html
 
     def test_fallback_parsing_without_delimiter(self, mock_cfg, mock_openai_chat):
