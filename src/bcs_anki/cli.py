@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import logging
+import random
 import shutil
+import subprocess
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -343,6 +346,113 @@ def validate(csv_file: Path) -> None:
             raise click.ClickException(f"Line {i} has unexpected note type: {note_type}")
 
     click.echo("CSV appears valid for Anki import.")
+
+
+@main.command()
+@click.argument("csv_file", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("--image-dir", type=click.Path(exists=True, file_okay=False, path_type=Path), default=None, help="Directory containing generated images.")
+@click.option("--sample", "-n", type=int, default=None, help="Randomly sample N words to review.")
+@click.option("--reject-file", "-r", type=click.Path(dir_okay=False, path_type=Path), default=None, help="File to write rejected words to.")
+def review(csv_file: Path, image_dir: Optional[Path], sample: Optional[int], reject_file: Optional[Path]) -> None:
+    """Review generated flashcards for subjective quality."""
+    text = csv_file.read_text(encoding="utf-8")
+    lines = text.splitlines()
+
+    # Skip header lines (lines starting with #)
+    data_lines = [l for l in lines if l.strip() and not l.startswith("#")]
+
+    # Group rows by word — every 3 rows = one word (def, examples, image)
+    words: list[dict] = []
+    for i in range(0, len(data_lines), 3):
+        group = data_lines[i : i + 3]
+        if len(group) < 3:
+            break
+        def_parts = group[0].split("\t")
+        ex_parts = group[1].split("\t")
+        img_parts = group[2].split("\t")
+
+        # Extract the word from the image row (field2)
+        word = img_parts[2] if len(img_parts) > 2 else "?"
+
+        # Extract image filename from the img tag
+        img_field = img_parts[1] if len(img_parts) > 1 else ""
+        img_file = ""
+        if 'src="' in img_field:
+            img_file = img_field.split('src="')[1].split('"')[0]
+
+        words.append({
+            "word": word,
+            "definition": def_parts[1] if len(def_parts) > 1 else "",
+            "examples": ex_parts[1] if len(ex_parts) > 1 else "",
+            "image_file": img_file,
+        })
+
+    if not words:
+        click.echo("No words found in CSV.")
+        return
+
+    if sample is not None and sample < len(words):
+        words = random.sample(words, sample)
+
+    total = len(words)
+    rejected: list[str] = []
+    accepted = 0
+    reviewed = 0
+
+    for idx, entry in enumerate(words, 1):
+        click.echo(f"\n{'─' * 3} Word {idx}/{total}: {entry['word']} {'─' * 40}")
+        click.echo(f"Definition: {entry['definition'][:120]}...")
+        click.echo(f"Examples:   {entry['examples'][:120]}...")
+
+        img_display = entry["image_file"]
+        if image_dir and entry["image_file"]:
+            img_display = str(image_dir / entry["image_file"])
+        click.echo(f"Image:      {img_display}")
+
+        while True:
+            click.echo("\n[a]ccept  [r]eject  [o]pen image  [q]uit")
+            choice = click.getchar().lower()
+
+            if choice == "a":
+                accepted += 1
+                reviewed += 1
+                break
+            elif choice == "r":
+                rejected.append(entry["word"])
+                reviewed += 1
+                break
+            elif choice == "o":
+                if image_dir and entry["image_file"]:
+                    img_path = image_dir / entry["image_file"]
+                    if img_path.exists():
+                        if sys.platform == "darwin":
+                            subprocess.run(["open", str(img_path)], check=False)
+                        elif sys.platform == "linux":
+                            subprocess.run(["xdg-open", str(img_path)], check=False)
+                        else:
+                            subprocess.run(["start", str(img_path)], check=False, shell=True)
+                    else:
+                        click.echo(f"  Image not found: {img_path}")
+                else:
+                    click.echo("  No image directory specified (use --image-dir).")
+            elif choice == "q":
+                click.echo("\nQuitting review.")
+                reviewed += 0  # current word not counted
+                break
+        else:
+            continue
+
+        if choice == "q":
+            break
+
+    # Write rejected words
+    out_reject = reject_file or Path("rejected.txt")
+    if rejected:
+        out_reject.write_text("\n".join(rejected) + "\n", encoding="utf-8")
+
+    click.echo(f"\nReviewed {reviewed} words: {accepted} accepted, {len(rejected)} rejected.")
+    if rejected:
+        click.echo(f"Rejected words saved to {out_reject}")
 
 
 if __name__ == "__main__":
