@@ -97,3 +97,33 @@
 2026-02-13 11:04:01 | INFO     | bcs_anki.images | Generated image prompt
 2026-02-13 11:04:01 | INFO     | bcs_anki.processing | [Izrazito] getting image (ai): ✓
 2026-02-13 11:04:01 | INFO     | bcs_anki.images | Generating AI image for 'izrazit' with prompt: Create an abstract art scene that vividly represents the concept of 'izrazito,' emphasizing clarity ...
+2026-02-13 11:04:15 | INFO     | bcs_anki.images | Saved AI-generated image to temp_images/izrazit_54d375.png
+2026-02-13 11:04:15 | INFO     | bcs_anki.processing | [Izrazito] image obtained: ✓ - file: izrazit_54d375.png
+2026-02-13 11:04:15 | INFO     | bcs_anki.processing | [Izrazito] complete: ✓ - all cards generated
+2026-02-13 11:04:15 | INFO     | bcs_anki.csv_generator | Wrote 3 cards for 'izrazit' to CSV
+2026-02-13 11:04:15 | DEBUG    | bcs_anki.progress | Marked 'Izrazito' as completed
+2026-02-13 11:04:17 | INFO     | bcs_anki.processor | [7/44] Processing: Poljuljani
+2026-02-13 11:04:17 | INFO     | bcs_anki.processing | [Poljuljani] generating definition: ✓
+2026-02-13 11:04:19 | INFO     | bcs_anki.processing | [Poljuljani] definition generated: ✓ - canonical: poljuljan
+2026-02-13 11:04:19 | INFO     | bcs_anki.processing | [Poljuljani] generating sentences: ✓
+2026-02-13 11:04:22 | INFO     | bcs_anki.processing | [Poljuljani] sentences generated: ✓
+2026-02-13 11:04:22 | INFO     | bcs_anki.processing | [Poljuljani] deciding image type: ✓
+2026-02-13 11:04:25 | INFO     | bcs_anki.llm | Image type decision for 'Poljuljani': ai (translation: unsteady, reason: The word 'poljuljan' refers to a state of losing stability or balance, or being brought into a state of uncertainty or doubt. This is an abstract concept that involves emotions and states of being, which are best represented through creative interpretation rather than a concrete image.)
+2026-02-13 11:04:25 | INFO     | bcs_anki.processing | [Poljuljani] generating image prompt: ✓
+2026-02-13 11:04:32 | INFO     | bcs_anki.llm | Generated image prompt for 'Poljuljani': style=Surrealist, rationale=The surrealist style, with its ability to distort reality and emphasize the unusual, effectively captures the concept of 'poljuljan,' which involves losing stability and balance. By visualizing a bridge—symbolic of connection and balance—in a precarious state, the image creates a memorable metaphor that conveys the essence of the word in a culturally relevant and contextually meaningful way.
+2026-02-13 11:04:32 | INFO     | bcs_anki.images | Generated image prompt
+2026-02-13 11:04:32 | INFO     | bcs_anki.processing | [Poljuljani] getting image (ai): ✓
+2026-02-13 11:04:32 | INFO     | bcs_anki.images | Generating AI image for 'poljuljan' with prompt: Create a surrealist image depicting a large, ancient stone bridge that appears to be swaying and uns...
+2026-02-13 11:04:45 | INFO     | bcs_anki.images | Saved AI-generated image to temp_images/poljuljan_e17db9.png
+2026-02-13 11:04:45 | INFO     | bcs_anki.processing | [Poljuljani] image obtained: ✓ - file: poljuljan_e17db9.png
+2026-02-13 11:04:45 | INFO     | bcs_anki.processing | [Poljuljani] complete: ✓ - all cards generated
+2026-02-13 11:04:45 | INFO     | bcs_anki.csv_generator | Wrote 3 cards for 'poljuljan' to CSV
+2026-02-13 11:04:45 | DEBUG    | bcs_anki.progress | Marked 'Poljuljani' as completed
+2026-02-13 11:04:47 | INFO     | bcs_anki.processor | [8/44] Processing: Izjadati
+2026-02-13 11:04:47 | INFO     | bcs_anki.processing | [Izjadati] generating definition: ✓
+2026-02-13 11:04:48 | INFO     | bcs_anki.processing | [Izjadati] definition generated: ✓ - canonical: izjadati
+2026-02-13 11:04:48 | INFO     | bcs_anki.processing | [Izjadati] generating sentences: ✓
+2026-02-13 11:04:52 | INFO     | bcs_anki.processing | [Izjadati] sentences generated: ✓
+2026-02-13 11:04:52 | INFO     | bcs_anki.processing | [Izjadati] deciding image type: ✓
+2026-02-13 11:04:54 | INFO     | bcs_anki.llm | Image type decision for 'Izjadati': ai (translation: to vent, reason: The word 'izjadati' refers to the act of expressing grievances or problems, which is an abstract action and emotional process. It requires creative interpretation to visually represent the concept of venting or seeking support, making it suitable for an AI-generated image.)
+2026-02-13 11:04:54 | INFO     | bcs_anki.processing | [Izjadati] generating image prompt: ✓

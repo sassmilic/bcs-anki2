@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import shutil
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
@@ -17,11 +18,24 @@ from .images import (
     fetch_stock_image,
     generate_ai_image,
 )
-from .llm import generate_definition_and_examples, generate_image_prompt
+from .llm import generate_definition_and_examples, generate_image_prompt, generate_image_search_term
 from .logging_utils import setup_logging
 from .progress import ProgressState, load_progress, progress_path_for, save_progress
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class WordEntry:
+    word: str
+    context: str | None
+
+
+def parse_word_line(line: str) -> WordEntry:
+    if "|" in line:
+        word, context = line.split("|", maxsplit=1)
+        return WordEntry(word=word.strip(), context=context.strip())
+    return WordEntry(word=line.strip(), context=None)
 
 
 def _load_app_config(config_path: Optional[str]) -> AppConfig:
@@ -62,12 +76,29 @@ def generate(
 
     setup_logging(cfg.log_file, verbose=verbose)
 
+    # Log effective (sanitized) configuration
+    safe_cfg = {
+        "openai_api_key": "set" if cfg.openai_api_key else "not set",
+        "image_generation_model": cfg.image_generation_model,
+        "image_size": cfg.image_size,
+        "stock_image_api": cfg.stock_image_api,
+        "stock_image_api_key": "set" if cfg.stock_image_api_key else "not set",
+        "anki_media_folder": str(cfg.anki_media_folder),
+        "output_folder": str(cfg.output_folder),
+        "temp_image_folder": str(cfg.temp_image_folder),
+        "log_file": str(cfg.log_file),
+        "rate_limit_delay_seconds": cfg.rate_limit_delay_seconds,
+        "tags": cfg.tags,
+        "llm_model": cfg.llm_model,
+    }
+    logger.info("Loaded configuration: %s", safe_cfg)
+
     out_csv = output_csv or (cfg.output_folder / (input_file.stem + ".csv"))
     ensure_header(out_csv)
 
-    progress_file = progress_path_for(input_file)
-    words = [w.strip() for w in input_file.read_text(encoding="utf-8").splitlines() if w.strip()]
-    total_words = len(words)
+    progress_file = progress_path_for(input_file, cfg.output_folder)
+    entries = [parse_word_line(line) for line in input_file.read_text(encoding="utf-8").splitlines() if line.strip()]
+    total_words = len(entries)
 
     state: ProgressState
     if fresh or not resume or not progress_file.exists():
@@ -97,27 +128,22 @@ def generate(
 
     click.echo(f"Processing {total_words} words from {input_file} (already done: {already_done})...")
 
-    for word in words:
+    for entry in entries:
+        word = entry.word
         if word in state.completed_words:
             logger.info("Skipping already completed word: %s", word)
             continue
 
-        # Za sada samo prosljeđujemo riječ direktno; ovdje se može dodati
-        # naprednija normalizacija (npr. uklanjanje dijakritika, mala/velika slova).
-        normalized = word
-
-        canonical = word  # Placeholder: in a full app, add POS detection & canonicalization.
-        canonical_info = "kanonski oblik; gramatičke informacije nisu specificirane"
-
-        logger.info("Processing word: %s (canonical: %s)", normalized, canonical)
+        logger.info("Processing word: %s", word)
 
         if dry_run:
-            click.echo(f"[DRY-RUN] Would process: {normalized}")
+            ctx_info = f" (context: {entry.context})" if entry.context else ""
+            click.echo(f"[DRY-RUN] Would process: {word}{ctx_info}")
             continue
 
         try:
             # LLM definitions and examples
-            gen = generate_definition_and_examples(cfg, normalized, canonical_info)
+            gen = generate_definition_and_examples(cfg, word, context=entry.context)
             def_row = CsvRow(
                 note_type="Cloze",
                 field1=gen.definition_html,
@@ -132,26 +158,36 @@ def generate(
             )
 
             # Image logic
-            img_source: ImageSource = decide_image_source(normalized, canonical_info)
-            img_filename = build_image_filename(normalized)
+            img_source: ImageSource = decide_image_source(word)
+            img_filename = build_image_filename(word)
             img_path = cfg.temp_image_folder / img_filename
             cfg.temp_image_folder.mkdir(parents=True, exist_ok=True)
 
             if img_source == "stock":
-                logger.info("Using stock image for '%s'", normalized)
-                # In a real implementation, we would translate to English first.
-                fetch_stock_image(cfg, normalized, img_path)
-            else:
-                logger.info("Using AI image for '%s'", normalized)
-                img_prompt = generate_image_prompt(cfg, normalized, canonical_info)
-                logger.info("Image prompt for '%s': %s", normalized, img_prompt)
+                logger.info("Using stock image for '%s'", word)
+                try:
+                    search_term_en = generate_image_search_term(cfg, word, context=entry.context)
+                    logger.info("Image search term (EN) for '%s': %s", word, search_term_en)
+                    fetch_stock_image(cfg, search_term_en, img_path)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning(
+                        "Stock image failed for '%s', falling back to AI image: %s",
+                        word,
+                        exc,
+                    )
+                    img_source = "ai"
+
+            if img_source == "ai":
+                logger.info("Using AI image for '%s'", word)
+                img_prompt = generate_image_prompt(cfg, word, context=entry.context)
+                logger.info("Image prompt for '%s': %s", word, img_prompt)
                 generate_ai_image(cfg, img_prompt, img_path)
 
             img_html = f'<img src="{img_filename}">'
             img_row = CsvRow(
                 note_type="Basic (and reversed card)",
                 field1=img_html,
-                field2=canonical,
+                field2=word,
                 tags=cfg.tags,
             )
 
@@ -225,9 +261,11 @@ def copy_media(src: Path, dst: Path) -> None:
 
 @main.command()
 @click.argument("input_file", type=click.Path(exists=True, dir_okay=False, path_type=Path))
-def status(input_file: Path) -> None:
+@click.option("--config", "-c", "config_path", type=click.Path(exists=False, dir_okay=False, path_type=Path))
+def status(input_file: Path, config_path: Optional[Path]) -> None:
     """Show progress for a given input file."""
-    progress_file = progress_path_for(input_file)
+    cfg = _load_app_config(str(config_path) if config_path else None)
+    progress_file = progress_path_for(input_file, cfg.output_folder)
     state = load_progress(progress_file)
     if not state:
         click.echo("No progress found.")
