@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+.venv/
+
+# Environment / secrets
+.env
+
+# Project artifacts
+output.csv
+processing.log
+temp_images/
+*.progress.json
+.progress_words_*.json
+
+# OS
+.DS_Store
