@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TextIO
+
+# Module-level lock for thread-safe CSV appending
+_csv_lock = threading.Lock()
 
 
 HEADER = """#separator:Tab
@@ -33,9 +37,10 @@ def ensure_header(path: Path) -> None:
 
 
 def append_rows(path: Path, rows: list[CsvRow]) -> None:
-    ensure_header(path)
-    with path.open("a", encoding="utf-8") as f:
-        _write_rows(f, rows)
+    with _csv_lock:
+        ensure_header(path)
+        with path.open("a", encoding="utf-8") as f:
+            _write_rows(f, rows)
 
 
 def _write_rows(f: TextIO, rows: list[CsvRow]) -> None:

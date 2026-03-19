@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import shutil
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -20,7 +21,7 @@ from .images import (
 )
 from .llm import generate_definition_and_examples, generate_image_prompt, generate_image_search_term
 from .logging_utils import setup_logging
-from .progress import ProgressState, load_progress, progress_path_for, save_progress
+from .progress import ProgressState, load_progress, mark_completed, mark_failed, progress_path_for
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,88 @@ def _load_app_config(config_path: Optional[str]) -> AppConfig:
     return cfg
 
 
+def _fetch_image(cfg: AppConfig, entry: WordEntry, word: str) -> tuple[str, Path]:
+    """Fetch or generate an image for a word. Returns (img_filename, img_path)."""
+    img_source: ImageSource = decide_image_source(word)
+    img_filename = build_image_filename(word)
+    img_path = cfg.temp_image_folder / img_filename
+    cfg.temp_image_folder.mkdir(parents=True, exist_ok=True)
+
+    if img_source == "stock":
+        logger.info("Using stock image for '%s'", word)
+        try:
+            search_term_en = generate_image_search_term(cfg, word, context=entry.context)
+            logger.info("Image search term (EN) for '%s': %s", word, search_term_en)
+            fetch_stock_image(cfg, search_term_en, img_path)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Stock image failed for '%s', falling back to AI image: %s",
+                word,
+                exc,
+            )
+            img_source = "ai"
+
+    if img_source == "ai":
+        logger.info("Using AI image for '%s'", word)
+        img_prompt = generate_image_prompt(cfg, word, context=entry.context)
+        logger.info("Image prompt for '%s': %s", word, img_prompt)
+        generate_ai_image(cfg, img_prompt, img_path)
+
+    return img_filename, img_path
+
+
+def _process_word(
+    entry: WordEntry,
+    cfg: AppConfig,
+    state: ProgressState,
+    out_csv: Path,
+    progress_file: Path,
+) -> bool:
+    """Process a single word with within-word parallelism. Returns True on success."""
+    word = entry.word
+    logger.info("Processing word: %s", word)
+
+    try:
+        # Run definition and image generation in parallel
+        with ThreadPoolExecutor(max_workers=2) as inner_pool:
+            def_future = inner_pool.submit(
+                generate_definition_and_examples, cfg, word, context=entry.context
+            )
+            img_future = inner_pool.submit(_fetch_image, cfg, entry, word)
+
+            gen = def_future.result()
+            img_filename, _img_path = img_future.result()
+
+        def_row = CsvRow(
+            note_type="Cloze",
+            field1=gen.definition_html,
+            field2="",
+            tags=cfg.tags,
+        )
+        ex_row = CsvRow(
+            note_type="Cloze",
+            field1=gen.examples_html,
+            field2="",
+            tags=cfg.tags,
+        )
+        img_html = f'<img src="{img_filename}">'
+        img_row = CsvRow(
+            note_type="Basic (and reversed card)",
+            field1=img_html,
+            field2=word,
+            tags=cfg.tags,
+        )
+
+        append_rows(out_csv, [def_row, ex_row, img_row])
+        mark_completed(progress_file, state, word)
+        return True
+
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Failed to process word '%s': %s", word, exc)
+        mark_failed(progress_file, state, word)
+        return False
+
+
 @click.group()
 @click.version_option(package_name="bcs-anki")
 def main() -> None:
@@ -59,6 +142,7 @@ def main() -> None:
 @click.option("--fresh", is_flag=True, help="Ignore checkpoint and start fresh.")
 @click.option("--verbose", "-v", is_flag=True, help="Verbose output.")
 @click.option("--dry-run", is_flag=True, help="Show what would be processed without making API calls.")
+@click.option("--workers", "-w", type=int, default=None, help="Max parallel workers (overrides config).")
 def generate(
     input_file: Path,
     output_csv: Optional[Path],
@@ -68,11 +152,14 @@ def generate(
     fresh: bool,
     verbose: bool,
     dry_run: bool,
+    workers: Optional[int],
 ) -> None:
     """Generate Anki-ready CSV and images from a word list."""
     cfg = _load_app_config(str(config_path) if config_path else None)
     if anki_media:
         cfg.anki_media_folder = anki_media.expanduser()
+    if workers is not None:
+        cfg.max_workers = workers
 
     setup_logging(cfg.log_file, verbose=verbose)
 
@@ -90,6 +177,7 @@ def generate(
         "rate_limit_delay_seconds": cfg.rate_limit_delay_seconds,
         "tags": cfg.tags,
         "llm_model": cfg.llm_model,
+        "max_workers": cfg.max_workers,
     }
     logger.info("Loaded configuration: %s", safe_cfg)
 
@@ -128,103 +216,49 @@ def generate(
 
     click.echo(f"Processing {total_words} words from {input_file} (already done: {already_done})...")
 
-    for entry in entries:
-        word = entry.word
-        if word in state.completed_words:
-            logger.info("Skipping already completed word: %s", word)
-            continue
+    # Filter to words that still need processing
+    pending = [e for e in entries if e.word not in state.completed_words]
 
-        logger.info("Processing word: %s", word)
-
-        if dry_run:
+    if dry_run:
+        for entry in pending:
             ctx_info = f" (context: {entry.context})" if entry.context else ""
-            click.echo(f"[DRY-RUN] Would process: {word}{ctx_info}")
-            continue
+            click.echo(f"[DRY-RUN] Would process: {entry.word}{ctx_info}")
+    else:
+        effective_workers = min(cfg.max_workers, len(pending)) if pending else 1
+        click.echo(f"Using {effective_workers} workers for {len(pending)} remaining words.")
 
-        try:
-            # LLM definitions and examples
-            gen = generate_definition_and_examples(cfg, word, context=entry.context)
-            def_row = CsvRow(
-                note_type="Cloze",
-                field1=gen.definition_html,
-                field2="",
-                tags=cfg.tags,
-            )
-            ex_row = CsvRow(
-                note_type="Cloze",
-                field1=gen.examples_html,
-                field2="",
-                tags=cfg.tags,
-            )
+        with ThreadPoolExecutor(max_workers=effective_workers) as pool:
+            future_to_word = {
+                pool.submit(_process_word, entry, cfg, state, out_csv, progress_file): entry.word
+                for entry in pending
+            }
 
-            # Image logic
-            img_source: ImageSource = decide_image_source(word)
-            img_filename = build_image_filename(word)
-            img_path = cfg.temp_image_folder / img_filename
-            cfg.temp_image_folder.mkdir(parents=True, exist_ok=True)
+            for future in as_completed(future_to_word):
+                word = future_to_word[future]
+                success = future.result()
+                processed_since_start += 1
 
-            if img_source == "stock":
-                logger.info("Using stock image for '%s'", word)
-                try:
-                    search_term_en = generate_image_search_term(cfg, word, context=entry.context)
-                    logger.info("Image search term (EN) for '%s': %s", word, search_term_en)
-                    fetch_stock_image(cfg, search_term_en, img_path)
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning(
-                        "Stock image failed for '%s', falling back to AI image: %s",
-                        word,
-                        exc,
+                # Periodic progress logging
+                if processed_since_start % 10 == 0:
+                    elapsed = time.monotonic() - start_time
+                    avg_per_word = elapsed / processed_since_start
+                    remaining = len(pending) - processed_since_start
+                    if remaining < 0:
+                        remaining = 0
+                    eta_seconds = remaining * avg_per_word
+                    minutes, seconds = divmod(int(eta_seconds), 60)
+                    eta_str = f"{minutes}m {seconds}s" if minutes else f"{seconds}s"
+
+                    done = already_done + processed_since_start
+                    percent = (done / total_words * 100) if total_words else 100.0
+                    logger.info(
+                        "Progress: %d/%d words processed (%.1f%%). Remaining: %d. Approximate remaining time: %s.",
+                        done,
+                        total_words,
+                        percent,
+                        remaining,
+                        eta_str,
                     )
-                    img_source = "ai"
-
-            if img_source == "ai":
-                logger.info("Using AI image for '%s'", word)
-                img_prompt = generate_image_prompt(cfg, word, context=entry.context)
-                logger.info("Image prompt for '%s': %s", word, img_prompt)
-                generate_ai_image(cfg, img_prompt, img_path)
-
-            img_html = f'<img src="{img_filename}">'
-            img_row = CsvRow(
-                note_type="Basic (and reversed card)",
-                field1=img_html,
-                field2=word,
-                tags=cfg.tags,
-            )
-
-            append_rows(out_csv, [def_row, ex_row, img_row])
-
-            state.completed_words.append(word)
-            if word in state.failed_words:
-                state.failed_words.remove(word)
-            save_progress(progress_file, state)
-            processed_since_start += 1
-
-            # Periodic progress logging
-            if processed_since_start and processed_since_start % 10 == 0:
-                elapsed = time.monotonic() - start_time
-                avg_per_word = elapsed / processed_since_start
-                remaining = total_words - (already_done + processed_since_start)
-                if remaining < 0:
-                    remaining = 0
-                eta_seconds = remaining * avg_per_word
-                minutes, seconds = divmod(int(eta_seconds), 60)
-                eta_str = f"{minutes}m {seconds}s" if minutes else f"{seconds}s"
-
-                done = already_done + processed_since_start
-                percent = (done / total_words * 100) if total_words else 100.0
-                logger.info(
-                    "Progress: %d/%d words processed (%.1f%%). Remaining: %d. Approximate remaining time: %s.",
-                    done,
-                    total_words,
-                    percent,
-                    remaining,
-                    eta_str,
-                )
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("Failed to process word '%s': %s", word, exc)
-            if word not in state.failed_words:
-                state.failed_words.append(word)
-            save_progress(progress_file, state)
 
     # Final progress/ETA log
     done_total = len(state.completed_words) + len(state.failed_words)

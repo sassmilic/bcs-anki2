@@ -13,6 +13,8 @@ build/
 
 # Project artifacts
 output.csv
+output/
+src/output/
 processing.log
 temp_images/
 *.progress.json
