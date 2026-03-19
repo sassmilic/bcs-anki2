@@ -16,20 +16,6 @@ logger = logging.getLogger(__name__)
 ImageSource = Literal["stock", "ai"]
 
 
-def decide_image_source(word: str) -> ImageSource:
-    """
-    Lightweight heuristic:
-    - Multi-word phrases -> AI (harder to find stock photos).
-    - Single words ending in common noun suffixes -> stock.
-    - Everything else -> AI.
-    """
-    lower = word.lower()
-    if " " in lower:
-        return "ai"
-    if lower.endswith(("a", "o", "e")):
-        return "stock"
-    return "ai"
-
 
 def _short_hash(text: str) -> str:
     return hashlib.sha1(text.encode("utf-8")).hexdigest()[:6]

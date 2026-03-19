@@ -15,11 +15,15 @@ from .csv_writer import CsvRow, append_rows, ensure_header
 from .images import (
     ImageSource,
     build_image_filename,
-    decide_image_source,
     fetch_stock_image,
     generate_ai_image,
 )
-from .llm import generate_definition_and_examples, generate_image_prompt, generate_image_search_term
+from .llm import (
+    decide_image_source,
+    generate_definition_and_examples,
+    generate_image_prompt,
+    generate_image_search_term,
+)
 from .logging_utils import setup_logging
 from .progress import ProgressState, load_progress, mark_completed, mark_failed, progress_path_for
 
@@ -47,7 +51,7 @@ def _load_app_config(config_path: Optional[str]) -> AppConfig:
 
 def _fetch_image(cfg: AppConfig, entry: WordEntry, word: str) -> tuple[str, Path]:
     """Fetch or generate an image for a word. Returns (img_filename, img_path)."""
-    img_source: ImageSource = decide_image_source(word)
+    img_source: ImageSource = decide_image_source(cfg, word, context=entry.context)
     img_filename = build_image_filename(word)
     img_path = cfg.temp_image_folder / img_filename
     cfg.temp_image_folder.mkdir(parents=True, exist_ok=True)

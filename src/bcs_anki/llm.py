@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from openai import OpenAI
 
 from .config import AppConfig
+from .images import ImageSource
 from .prompts import (
     CONTEXT_ADDENDUM,
     DEFINITION_SYSTEM,
@@ -14,6 +15,8 @@ from .prompts import (
     IMAGE_PROMPT_USER,
     IMAGE_SEARCH_SYSTEM,
     IMAGE_SEARCH_USER,
+    IMAGE_SOURCE_SYSTEM,
+    IMAGE_SOURCE_USER,
 )
 
 logger = logging.getLogger(__name__)
@@ -62,6 +65,16 @@ def generate_definition_and_examples(cfg: AppConfig, word: str, context: str | N
         examples_part = "\n".join(lines[1:])
 
     return GeneratedText(definition_html=definition_part.strip(), examples_html=examples_part.strip())
+
+
+def decide_image_source(cfg: AppConfig, word: str, context: str | None = None) -> ImageSource:
+    """Ask the LLM whether a word is best represented by a stock photo or AI image."""
+    user_prompt = _with_context(IMAGE_SOURCE_USER.format(word=word), context)
+    text = _chat(cfg, IMAGE_SOURCE_SYSTEM, user_prompt).strip().lower()
+    if text in ("stock", "ai"):
+        return text
+    logger.warning("Unexpected image source response '%s' for '%s', defaulting to 'ai'", text, word)
+    return "ai"
 
 
 def generate_image_prompt(cfg: AppConfig, word: str, context: str | None = None) -> str:

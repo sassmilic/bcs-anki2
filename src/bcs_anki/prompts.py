@@ -68,6 +68,33 @@ Return:
 - Do NOT include quotes or any extra explanation, only the keywords."""
 
 
+# --- Image source decision (stock vs AI) ---
+
+IMAGE_SOURCE_SYSTEM = (
+    "You are a visual content strategist. You decide whether a concept is best "
+    "illustrated by a stock photograph or an AI-generated illustration."
+)
+
+IMAGE_SOURCE_USER = """\
+Word (Bosnian/Croatian/Serbian): "{word}"
+
+Decide whether this word/concept can be clearly and unambiguously represented by a \
+simple stock photograph.
+
+Reply ONLY with "stock" or "ai" — nothing else.
+
+Guidelines:
+- "stock" — concrete, everyday objects, animals, places, common actions, or professions \
+that photograph well and are unlikely to be ambiguous in a photo.\
+  Examples: apple, kitchen, ankle, zoo, bicycle, sunset, doctor, bridge, cat, umbrella.
+- "ai" — abstract nouns, emotions, idioms, figurative expressions, culturally specific \
+concepts, rare/unusual things, or anything where a generic photo would be misleading \
+or unhelpful.\
+  Examples: hope, irony, wanderlust, "to pull someone's leg", melancholy, redemption.
+
+When in doubt, prefer "ai"."""
+
+
 # --- Context addendum (appended to any user prompt when context is provided) ---
 
 CONTEXT_ADDENDUM = '\n\nKontekst (primjer u kojem se riječ koristi): "{context}"'
