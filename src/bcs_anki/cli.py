@@ -175,7 +175,7 @@ def generate(
         "openai_api_key": "set" if cfg.openai_api_key else "not set",
         "image_generation_model": cfg.image_generation_model,
         "image_size": cfg.image_size,
-        "stock_image_api": cfg.stock_image_api,
+        "stock_image_api": cfg.stock_image_api or "none",
         "stock_image_api_key": "set" if cfg.stock_image_api_key else "not set",
         "anki_media_folder": str(cfg.anki_media_folder),
         "output_folder": str(cfg.output_folder),

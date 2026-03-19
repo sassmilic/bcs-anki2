@@ -10,7 +10,7 @@ from bcs_anki.config import AppConfig, load_config
 
 
 class TestDefaultConfig:
-    @patch.dict("os.environ", {"OPENAI_API_KEY": "k1", "STOCK_IMAGE_API_KEY": "k2"}, clear=False)
+    @patch.dict("os.environ", {"OPENAI_API_KEY": "k1", "UNSPLASH_API_KEY": "k2"}, clear=False)
     def test_defaults(self):
         cfg = load_config(None)
         assert isinstance(cfg, AppConfig)
@@ -20,11 +20,12 @@ class TestDefaultConfig:
         assert cfg.tags == "bcs naski"
         assert cfg.rate_limit_delay_seconds == 2.0
         assert cfg.openai_api_key == "k1"
+        assert cfg.stock_image_api == "unsplash"
         assert cfg.stock_image_api_key == "k2"
 
 
 class TestCustomConfig:
-    @patch.dict("os.environ", {"OPENAI_API_KEY": "k1", "STOCK_IMAGE_API_KEY": "k2"}, clear=False)
+    @patch.dict("os.environ", {"OPENAI_API_KEY": "k1", "UNSPLASH_API_KEY": "k2"}, clear=False)
     def test_yaml_overrides(self, tmp_path: Path):
         cfg_file = tmp_path / "config.yaml"
         cfg_file.write_text(
@@ -42,8 +43,9 @@ class TestCustomConfig:
 
 
 class TestEnvVarOverride:
-    @patch.dict("os.environ", {"OPENAI_API_KEY": "env-key", "STOCK_IMAGE_API_KEY": "env-stock"}, clear=False)
+    @patch.dict("os.environ", {"OPENAI_API_KEY": "env-key", "UNSPLASH_API_KEY": "env-stock"}, clear=False)
     def test_env_vars_used(self):
         cfg = load_config(None)
         assert cfg.openai_api_key == "env-key"
+        assert cfg.stock_image_api == "unsplash"
         assert cfg.stock_image_api_key == "env-stock"

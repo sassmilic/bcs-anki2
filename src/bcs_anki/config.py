@@ -13,12 +13,12 @@ from dotenv import load_dotenv
 class AppConfig:
     # API keys (from .env / environment only)
     openai_api_key: Optional[str]
+    stock_image_api: Optional[str]
     stock_image_api_key: Optional[str]
 
     # App settings
     image_generation_model: str
     image_size: str
-    stock_image_api: str
     anki_media_folder: Path
     output_folder: Path
     temp_image_folder: Path
@@ -33,9 +33,6 @@ DEFAULT_CONFIG_YAML = """\
 # Image generation
 image_generation_model: "dall-e-3"
 image_size: "1024x1024"
-
-# Stock image API (unsplash, pexels, or pixabay)
-stock_image_api: "unsplash"
 
 # Paths
 anki_media_folder: "~/Library/Application Support/Anki2/User 1/collection.media"
@@ -53,12 +50,30 @@ llm_model: "gpt-4.1-mini"
 """
 
 
+_STOCK_IMAGE_ENV_VARS = [
+    ("UNSPLASH_API_KEY", "unsplash"),
+    ("PEXELS_API_KEY", "pexels"),
+    ("PIXABAY_API_KEY", "pixabay"),
+]
+
+
 def _load_api_keys() -> dict[str, Optional[str]]:
     """Load API keys from .env file and/or environment variables."""
     load_dotenv()
+
+    stock_image_api: Optional[str] = None
+    stock_image_api_key: Optional[str] = None
+    for env_var, api_name in _STOCK_IMAGE_ENV_VARS:
+        key = os.getenv(env_var)
+        if key:
+            stock_image_api = api_name
+            stock_image_api_key = key
+            break
+
     return {
         "openai_api_key": os.getenv("OPENAI_API_KEY"),
-        "stock_image_api_key": os.getenv("STOCK_IMAGE_API_KEY"),
+        "stock_image_api": stock_image_api,
+        "stock_image_api_key": stock_image_api_key,
     }
 
 
@@ -83,10 +98,10 @@ def load_config(path: Optional[Path]) -> AppConfig:
 
     return AppConfig(
         openai_api_key=keys["openai_api_key"],
+        stock_image_api=keys["stock_image_api"],
         stock_image_api_key=keys["stock_image_api_key"],
         image_generation_model=data.get("image_generation_model", "dall-e-3"),
         image_size=data.get("image_size", "1024x1024"),
-        stock_image_api=data.get("stock_image_api", "unsplash"),
         anki_media_folder=Path(data.get("anki_media_folder", "./collection.media")).expanduser(),
         output_folder=Path(data.get("output_folder", "./output")).expanduser(),
         temp_image_folder=Path(data.get("temp_image_folder", "./temp_images")).expanduser(),
