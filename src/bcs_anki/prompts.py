@@ -105,6 +105,44 @@ or unhelpful.\
 When in doubt, prefer "ai"."""
 
 
+# --- Definition validation (reverse-guess) ---
+
+VALIDATE_DEFINITION_SYSTEM = (
+    "Ti si iskusni leksikograf za bosanski/hrvatski/srpski jezik (ijekavski)."
+)
+
+VALIDATE_DEFINITION_USER = """\
+Data ti je definicija jedne BHS riječi (ijekavski). Pogodi koja je riječ.
+
+Definicija: "{definition}"
+
+Vrati TAČNO 3 kandidata, poredana od najvjerovatnijeg ka najmanje vjerovatnom.
+Format: jedan kandidat po redu, sa procentom sigurnosti, bez dodatnog objašnjenja.
+
+Primjer formata:
+primirje 85%
+prekid 10%
+mir 5%"""
+
+
+# --- Definition refinement ---
+
+REFINE_DEFINITION_SYSTEM = DEFINITION_SYSTEM
+
+REFINE_DEFINITION_USER = """\
+Sljedeća definicija za riječ "{word}" nije dovoljno precizna — čitaoci je ne mogu \
+jednoznačno povezati s pravom riječju.
+
+Trenutna definicija: "{definition}"
+Pogrešne pretpostavke čitaoca: {wrong_guesses}
+
+Prepravi definiciju tako da jasnije i preciznije upućuje na "{word}".
+Definicija mora biti kratka (~10 riječi). Odvoji značenja tačkom-zarezom.
+
+Vrati SAMO jedan red u ovom formatu (bez oznake "DEFINICIJA:" i bez primjera):
+{{{{c1::KANONSKI_OBLIK}}}} (GRAMATIKA) — definicija; drugo značenje"""
+
+
 # --- Context addendum (appended to any user prompt when context is provided) ---
 
 CONTEXT_ADDENDUM = '\n\nKontekst (primjer u kojem se riječ koristi): "{context}"'

@@ -150,6 +150,7 @@ def main() -> None:
 @click.option("--verbose", "-v", is_flag=True, help="Verbose output.")
 @click.option("--dry-run", is_flag=True, help="Show what would be processed without making API calls.")
 @click.option("--workers", "-w", type=int, default=None, help="Max parallel workers (overrides config).")
+@click.option("--append", is_flag=True, help="Append to existing CSV instead of overwriting.")
 def generate(
     input_file: Path,
     output_csv: Optional[Path],
@@ -160,6 +161,7 @@ def generate(
     verbose: bool,
     dry_run: bool,
     workers: Optional[int],
+    append: bool,
 ) -> None:
     """Generate Anki-ready CSV and images from a word list."""
     cfg = _load_app_config(str(config_path) if config_path else None)
@@ -189,6 +191,9 @@ def generate(
     logger.info("Loaded configuration: %s", safe_cfg)
 
     out_csv = output_csv or (cfg.output_folder / (input_file.stem + ".csv"))
+    if not append and out_csv.exists():
+        out_csv.unlink()
+        logger.info("Removed existing output file: %s", out_csv)
     ensure_header(out_csv)
 
     progress_file = progress_path_for(input_file, cfg.output_folder)
