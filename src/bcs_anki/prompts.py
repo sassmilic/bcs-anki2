@@ -19,7 +19,7 @@ Zadatak:
 1) Prepoznaj KANONSKI OBLIK (lemu). Ako je riječ pogrešno napisana ili bez dijakritičkih znakova, tiho koristi ispravan oblik bez napomene.
 2) Odredi gramatičku kategoriju:
    - imenice: vrsta + rod (npr. "imenica, ž.")
-   - glagoli: vrsta + "ja" oblik (npr. "glagol, ja vidim")
+   - glagoli: OBAVEZNO vrsta + "ja" oblik u zagradi (npr. "glagol, ja vidim"). "Ja" oblik MORA biti uključen za SVAKI glagol.
    - ostalo: samo vrsta (npr. "pridjev", "prilog", "veznik")
    - Samo ako je riječ NEOBIČNA, dodaj kratku napomenu (npr. "arhaično", "pretežno u hrvatskom").
 3) Napiši KRATKU definiciju (~10 riječi) na BHS jeziku. Ako ima više značenja, odvoji ih tačkom-zarezom.
@@ -38,7 +38,8 @@ Pravila za primjere:
 - Svaka rečenica MAKSIMALNO 10 riječi.
 - Zajedno, rečenice trebaju pokriti SVA značenja riječi.
 - Koristi različite gramatičke oblike (padeže, vremena, vidove...) gdje je moguće.
-- Rečenice trebaju biti UPAMTLJIVE — koristi snažne vizuelne slike ili emocije."""
+- Rečenice trebaju biti UPAMTLJIVE — koristi snažne vizuelne slike ili emocije.
+- SVAKO pojavljivanje ciljne riječi u SVAKOJ rečenici MORA biti omotano u {{{{c1::...}}}}. Nikada ne piši ciljnu riječ bez omotača."""
 
 
 # --- Image prompt generation (for AI-generated images) ---
