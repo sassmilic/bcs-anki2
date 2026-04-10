@@ -16,20 +16,29 @@ DEFINITION_USER = """\
 Zadatak:
 - Za zadanu riječ ili izraz: "{word}"
 
-0) Pažljivo prepoznaj vjerovatni KANONSKI OBLIK (lemu) i osnovne gramatičke informacije (npr. rod, broj, padežna promjena, vid glagola...). Ako ulazna riječ izgleda POGREŠNO NAPISANO ili bez dijakritičkih znakova (č, ć, ž, š, đ), pretpostavi najvjerovatniji ispravan oblik i to jasno napomeni.
-1) Napiši JEDNU cjelovitu definiciju koja obuhvata sve glavne relevantne smislove.
-2) Zatim napiši TAČNO TRI primjerne rečenice, numerisane 1–3, u kojima se riječ pojavljuje u različitim oblicima (padeži, vremena, vidovi...), ali:
-   - Svako pojavljivanje ciljne riječi/izraza treba biti u formatu {{{{c1::OBLIK}}}}.
+1) Prepoznaj KANONSKI OBLIK (lemu). Ako je riječ pogrešno napisana ili bez dijakritičkih znakova, tiho koristi ispravan oblik bez napomene.
+2) Odredi gramatičku kategoriju:
+   - imenice: vrsta + rod (npr. "imenica, ž.")
+   - glagoli: vrsta + "ja" oblik (npr. "glagol, ja vidim")
+   - ostalo: samo vrsta (npr. "pridjev", "prilog", "veznik")
+   - Samo ako je riječ NEOBIČNA, dodaj kratku napomenu (npr. "arhaično", "pretežno u hrvatskom").
+3) Napiši KRATKU definiciju (~10 riječi) na BHS jeziku. Ako ima više značenja, odvoji ih tačkom-zarezom.
 
 Format izlaza:
 DEFINICIJA:
-{{{{c1::KANONSKI_OBLIK}}}} (GRAMMATIKA)<br>
-– definicija u jednom ili dva kraća, jasna iskaza.
+{{{{c1::KANONSKI_OBLIK}}}} (GRAMATIKA) — definicija; drugo značenje
 
-VAŽNO: NE komentariši pravopis ulazne riječi. Ako je riječ pogrešno napisana, jednostavno koristi ispravan oblik bez ikakve napomene.
+Primjer izlaza:
+{{{{c1::viditi}}}} (glagol, ja {{{{c1::vidim}}}}) — opažati očima; shvatiti, razumjeti
 
 PRIMJERI:
-1. Rečenica s {{{{c1::oblik1}}}}.<br>2. Rečenica s {{{{c1::oblik2}}}}.<br>3. Rečenica s {{{{c1::oblik3}}}}."""
+1. Rečenica s {{{{c1::oblik1}}}}.<br>2. Rečenica s {{{{c1::oblik2}}}}.<br>3. Rečenica s {{{{c1::oblik3}}}}.
+
+Pravila za primjere:
+- Svaka rečenica MAKSIMALNO 10 riječi.
+- Zajedno, rečenice trebaju pokriti SVA značenja riječi.
+- Koristi različite gramatičke oblike (padeže, vremena, vidove...) gdje je moguće.
+- Rečenice trebaju biti UPAMTLJIVE — koristi snažne vizuelne slike ili emocije."""
 
 
 # --- Image prompt generation (for AI-generated images) ---
