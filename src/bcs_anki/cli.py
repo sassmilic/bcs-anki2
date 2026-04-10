@@ -53,8 +53,8 @@ def _load_app_config(config_path: Optional[str]) -> AppConfig:
     return cfg
 
 
-def _fetch_image(cfg: AppConfig, entry: WordEntry, word: str) -> tuple[str, Path]:
-    """Fetch or generate an image for a word. Returns (img_filename, img_path)."""
+def _fetch_image(cfg: AppConfig, entry: WordEntry, word: str) -> tuple[str, Path] | None:
+    """Fetch or generate an image for a word. Returns (img_filename, img_path) or None."""
     img_source: ImageSource = decide_image_source(cfg, word, context=entry.context)
     img_filename = build_image_filename(word)
     img_path = cfg.temp_image_folder / img_filename
@@ -87,7 +87,13 @@ def _fetch_image(cfg: AppConfig, entry: WordEntry, word: str) -> tuple[str, Path
             )
             img_prompt = generate_image_prompt(cfg, word, context=entry.context)
             logger.info("Retry image prompt for '%s': %s", word, img_prompt)
-            generate_ai_image(cfg, img_prompt, img_path)
+            try:
+                generate_ai_image(cfg, img_prompt, img_path)
+            except BadRequestError:
+                logger.warning(
+                    "AI image retry also rejected for '%s', skipping image", word,
+                )
+                return None
 
     return img_filename, img_path
 
@@ -112,7 +118,7 @@ def _process_word(
             img_future = inner_pool.submit(_fetch_image, cfg, entry, word)
 
             gen = def_future.result()
-            img_filename, _img_path = img_future.result()
+            img_result = img_future.result()
 
         def_row = CsvRow(
             note_type="Cloze",
@@ -126,15 +132,20 @@ def _process_word(
             field2="",
             tags=cfg.tags,
         )
-        img_html = f'<img src="{img_filename}">'
-        img_row = CsvRow(
-            note_type="Basic (and reversed card)",
-            field1=img_html,
-            field2=word,
-            tags=cfg.tags,
-        )
+        rows = [def_row, ex_row]
 
-        append_rows(out_csv, [def_row, ex_row, img_row])
+        if img_result is not None:
+            img_filename, _img_path = img_result
+            img_html = f'<img src="{img_filename}">'
+            img_row = CsvRow(
+                note_type="Basic (and reversed card)",
+                field1=img_html,
+                field2=word,
+                tags=cfg.tags,
+            )
+            rows.append(img_row)
+
+        append_rows(out_csv, rows)
         mark_completed(progress_file, state, word)
         return True
 
@@ -298,10 +309,17 @@ def generate(
 
 
 @main.command("copy-media")
-@click.option("--from", "src", required=True, type=click.Path(file_okay=False, path_type=Path))
-@click.option("--to", "dst", required=True, type=click.Path(file_okay=False, path_type=Path))
-def copy_media(src: Path, dst: Path) -> None:
+@click.option("--from", "src", default=None, type=click.Path(file_okay=False, path_type=Path),
+              help="Source folder (default: temp_image_folder from config).")
+@click.option("--to", "dst", default=None, type=click.Path(file_okay=False, path_type=Path),
+              help="Destination folder (default: anki_media_folder from config).")
+@click.option("--config", "-c", "config_path", type=click.Path(exists=False, dir_okay=False, path_type=Path))
+def copy_media(src: Optional[Path], dst: Optional[Path], config_path: Optional[Path]) -> None:
     """Copy generated images to the Anki media folder."""
+    cfg = _load_app_config(str(config_path) if config_path else None)
+    src = src or cfg.temp_image_folder
+    dst = dst or cfg.anki_media_folder
+
     if not src.exists():
         raise click.ClickException(f"Source folder does not exist: {src}")
     dst.mkdir(parents=True, exist_ok=True)

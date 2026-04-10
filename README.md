@@ -13,8 +13,9 @@ Create a `.env` file:
 ```
 OPENAI_API_KEY=sk-...
 STOCK_IMAGE_API_KEY=...
-ANKI_MEDIA_FOLDER=~/Library/Application Support/Anki2/User 1/collection.media
 ```
+
+The Anki media folder defaults to `~/Library/Application Support/Anki2/User 1/collection.media`. To change it, create a config YAML with `anki_media_folder: /your/path` and pass `--config config.yaml`.
 
 ## Workflow
 
@@ -22,8 +23,8 @@ ANKI_MEDIA_FOLDER=~/Library/Application Support/Anki2/User 1/collection.media
 # 1. Generate flashcards + images from a word list
 bcs-anki generate words.txt
 
-# 2. Copy generated images to Anki media folder
-bcs-anki copy-media --from temp_images --to "$ANKI_MEDIA_FOLDER"
+# 2. Copy generated images to Anki media folder (uses config defaults)
+bcs-anki copy-media
 
 # 3. Import output/words.csv in Anki desktop (File > Import)
 ```

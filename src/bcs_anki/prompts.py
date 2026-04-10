@@ -19,7 +19,7 @@ Zadatak:
 1) Prepoznaj KANONSKI OBLIK (lemu). Ako je riječ pogrešno napisana ili bez dijakritičkih znakova, tiho koristi ispravan oblik bez napomene.
 2) Odredi gramatičku kategoriju:
    - imenice: vrsta + rod (npr. "imenica, ž.")
-   - glagoli: OBAVEZNO vrsta + "ja" oblik u zagradi (npr. "glagol, ja vidim"). "Ja" oblik MORA biti uključen za SVAKI glagol.
+   - glagoli: OBAVEZNO vrsta + "ja" oblik u zagradi, omotan u {{{{c1::...}}}} (npr. "glagol, ja {{{{c1::vidim}}}}"). "Ja" oblik MORA biti uključen za SVAKI glagol.
    - ostalo: samo vrsta (npr. "pridjev", "prilog", "veznik")
    - Samo ako je riječ NEOBIČNA, dodaj kratku napomenu (npr. "arhaično", "pretežno u hrvatskom").
 3) Napiši KRATKU definiciju (~10 riječi) na BHS jeziku. Ako ima više značenja, odvoji ih tačkom-zarezom.
