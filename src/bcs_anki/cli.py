@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Optional
 
 import click
+from openai import BadRequestError
 
 from .config import AppConfig, load_config
 from .csv_writer import CsvRow, append_rows, ensure_header
@@ -77,7 +78,16 @@ def _fetch_image(cfg: AppConfig, entry: WordEntry, word: str) -> tuple[str, Path
         logger.info("Using AI image for '%s'", word)
         img_prompt = generate_image_prompt(cfg, word, context=entry.context)
         logger.info("Image prompt for '%s': %s", word, img_prompt)
-        generate_ai_image(cfg, img_prompt, img_path)
+        try:
+            generate_ai_image(cfg, img_prompt, img_path)
+        except BadRequestError as exc:
+            logger.warning(
+                "AI image rejected by safety filter for '%s', regenerating prompt and retrying: %s",
+                word, exc,
+            )
+            img_prompt = generate_image_prompt(cfg, word, context=entry.context)
+            logger.info("Retry image prompt for '%s': %s", word, img_prompt)
+            generate_ai_image(cfg, img_prompt, img_path)
 
     return img_filename, img_path
 
