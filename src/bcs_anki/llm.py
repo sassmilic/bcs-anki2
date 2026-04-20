@@ -13,6 +13,8 @@ from .prompts import (
     CONTEXT_ADDENDUM,
     DEFINITION_SYSTEM,
     DEFINITION_USER,
+    EXAMPLES_SYSTEM,
+    EXAMPLES_USER,
     IMAGE_PROMPT_SYSTEM,
     IMAGE_PROMPT_USER,
     IMAGE_SEARCH_SYSTEM,
@@ -126,18 +128,11 @@ def _refine_definition(cfg: AppConfig, word: str, definition_html: str, wrong_gu
 
 
 def generate_definition_and_examples(cfg: AppConfig, word: str, context: str | None = None) -> GeneratedText:
-    user_prompt = _with_context(DEFINITION_USER.format(word=word), context)
-    text = _chat(cfg, DEFINITION_SYSTEM, user_prompt)
+    # Generate definition and examples with separate LLM calls
+    def_prompt = _with_context(DEFINITION_USER.format(word=word), context)
+    ex_prompt = _with_context(EXAMPLES_USER.format(word=word), context)
 
-    parts = text.split("PRIMJERI:")
-    if len(parts) == 2:
-        definition_part, examples_part = parts
-    else:
-        lines = text.splitlines()
-        definition_part = "\n".join(lines[:1])
-        examples_part = "\n".join(lines[1:])
-
-    definition_clean = definition_part.strip()
+    definition_clean = _chat(cfg, DEFINITION_SYSTEM, def_prompt).strip()
     if definition_clean.startswith("DEFINICIJA:"):
         definition_clean = definition_clean[len("DEFINICIJA:"):].strip()
 
@@ -154,7 +149,9 @@ def generate_definition_and_examples(cfg: AppConfig, word: str, context: str | N
         definition_clean = _refine_definition(cfg, word, definition_clean, guesses)
         logger.info("Refined definition for '%s': %s", word, definition_clean)
 
-    return GeneratedText(definition_html=definition_clean, examples_html=examples_part.strip())
+    examples_clean = _chat(cfg, EXAMPLES_SYSTEM, ex_prompt).strip()
+
+    return GeneratedText(definition_html=definition_clean, examples_html=examples_clean)
 
 
 def decide_image_source(cfg: AppConfig, word: str, context: str | None = None) -> ImageSource:

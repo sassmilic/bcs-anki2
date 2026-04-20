@@ -32,8 +32,9 @@ class TestFetchStockImage:
         )
         mock_req.side_effect = [search_resp, img_resp]
 
-        fetch_stock_image(mock_cfg, "ceasefire", dest)
+        paths = fetch_stock_image(mock_cfg, "ceasefire", dest)
         assert dest.read_bytes() == b"PNG_DATA"
+        assert len(paths) == 1
         # First call should be to unsplash API
         assert "unsplash" in mock_req.call_args_list[0].args[1]
 
@@ -47,8 +48,9 @@ class TestFetchStockImage:
         )
         mock_req.side_effect = [search_resp, img_resp]
 
-        fetch_stock_image(mock_cfg, "apple", dest)
+        paths = fetch_stock_image(mock_cfg, "apple", dest)
         assert dest.read_bytes() == b"PNG_DATA"
+        assert len(paths) == 1
         assert "pexels" in mock_req.call_args_list[0].args[1]
 
     @patch("bcs_anki.images.request_with_retries")
@@ -61,8 +63,9 @@ class TestFetchStockImage:
         )
         mock_req.side_effect = [search_resp, img_resp]
 
-        fetch_stock_image(mock_cfg, "cat", dest)
+        paths = fetch_stock_image(mock_cfg, "cat", dest)
         assert dest.read_bytes() == b"PNG_DATA"
+        assert len(paths) == 1
         assert "pixabay" in mock_req.call_args_list[0].args[1]
 
     @patch("bcs_anki.images.request_with_retries")

@@ -53,8 +53,8 @@ def _load_app_config(config_path: Optional[str]) -> AppConfig:
     return cfg
 
 
-def _fetch_image(cfg: AppConfig, entry: WordEntry, word: str) -> tuple[str, Path] | None:
-    """Fetch or generate an image for a word. Returns (img_filename, img_path) or None."""
+def _fetch_image(cfg: AppConfig, entry: WordEntry, word: str) -> list[tuple[str, Path]] | None:
+    """Fetch or generate images for a word. Returns list of (filename, path) or None."""
     img_source: ImageSource = decide_image_source(cfg, word, context=entry.context)
     img_filename = build_image_filename(word)
     img_path = cfg.temp_image_folder / img_filename
@@ -65,7 +65,8 @@ def _fetch_image(cfg: AppConfig, entry: WordEntry, word: str) -> tuple[str, Path
         try:
             search_term_en = generate_image_search_term(cfg, word, context=entry.context)
             logger.info("Image search term (EN) for '%s': %s", word, search_term_en)
-            fetch_stock_image(cfg, search_term_en, img_path)
+            paths = fetch_stock_image(cfg, search_term_en, img_path)
+            return [(p.name, p) for p in paths]
         except Exception as exc:  # noqa: BLE001
             logger.warning(
                 "Stock image failed for '%s', falling back to AI image: %s",
@@ -95,7 +96,7 @@ def _fetch_image(cfg: AppConfig, entry: WordEntry, word: str) -> tuple[str, Path
                 )
                 return None
 
-    return img_filename, img_path
+    return [(img_filename, img_path)]
 
 
 def _process_word(
@@ -120,30 +121,35 @@ def _process_word(
             gen = def_future.result()
             img_result = img_future.result()
 
-        def_row = CsvRow(
-            note_type="Cloze",
-            field1=gen.definition_html,
-            field2="",
-            tags=cfg.tags,
-        )
-        ex_row = CsvRow(
-            note_type="Cloze",
-            field1=gen.examples_html,
-            field2="",
-            tags=cfg.tags,
-        )
-        rows = [def_row, ex_row]
+        rows = []
+        if "{{c1::" in gen.definition_html:
+            rows.append(CsvRow(
+                note_type="Cloze",
+                field1=gen.definition_html,
+                field2="",
+                tags=cfg.tags,
+            ))
+        else:
+            logger.warning("Skipping definition card for '%s': no cloze markers found", word)
+
+        if "{{c1::" in gen.examples_html:
+            rows.append(CsvRow(
+                note_type="Cloze",
+                field1=gen.examples_html,
+                field2="",
+                tags=cfg.tags,
+            ))
+        else:
+            logger.warning("Skipping examples card for '%s': no cloze markers found", word)
 
         if img_result is not None:
-            img_filename, _img_path = img_result
-            img_html = f'<img src="{img_filename}">'
-            img_row = CsvRow(
+            img_html = "".join(f'<img src="{fn}">' for fn, _path in img_result)
+            rows.append(CsvRow(
                 note_type="Basic (and reversed card)",
                 field1=img_html,
-                field2=word,
+                field2=word.lower(),
                 tags=cfg.tags,
-            )
-            rows.append(img_row)
+            ))
 
         append_rows(out_csv, rows)
         mark_completed(progress_file, state, word)

@@ -5,7 +5,7 @@ Each pair is (system_prompt, user_prompt_template).
 User prompt templates use {word} for substitution.
 """
 
-# --- Definition & examples ---
+# --- Definition ---
 
 DEFINITION_SYSTEM = (
     "Ti si iskusni leksikograf za bosanski/hrvatski/srpski jezik (ijekavski). "
@@ -22,24 +22,34 @@ Zadatak:
    - glagoli: OBAVEZNO vrsta + "ja" oblik u zagradi, omotan u {{{{c1::...}}}} (npr. "glagol, ja {{{{c1::vidim}}}}"). "Ja" oblik MORA biti uključen za SVAKI glagol.
    - ostalo: samo vrsta (npr. "pridjev", "prilog", "veznik")
    - Samo ako je riječ NEOBIČNA, dodaj kratku napomenu (npr. "arhaično", "pretežno u hrvatskom").
-3) Napiši KRATKU definiciju (~10 riječi) na BHS jeziku. Ako ima više značenja, odvoji ih tačkom-zarezom.
+3) Napiši KRATKU definiciju (maksimalno 15 riječi) na BHS jeziku. Ako ima više značenja, odvoji ih tačkom-zarezom.
 
-Format izlaza:
-DEFINICIJA:
+Format izlaza (SAMO jedan red, bez oznake "DEFINICIJA:"):
 {{{{c1::KANONSKI_OBLIK}}}} (GRAMATIKA) — definicija; drugo značenje
 
 Primjer izlaza:
-{{{{c1::viditi}}}} (glagol, ja {{{{c1::vidim}}}}) — opažati očima; shvatiti, razumjeti
+{{{{c1::viditi}}}} (glagol, ja {{{{c1::vidim}}}}) — opažati očima; shvatiti, razumjeti"""
 
-PRIMJERI:
-1. Rečenica s {{{{c1::oblik1}}}}.<br>2. Rečenica s {{{{c1::oblik2}}}}.<br>3. Rečenica s {{{{c1::oblik3}}}}.
 
-Pravila za primjere:
+# --- Examples ---
+
+EXAMPLES_SYSTEM = DEFINITION_SYSTEM
+
+EXAMPLES_USER = """\
+Zadatak:
+- Za zadanu riječ ili izraz: "{word}"
+
+Napiši 3 primjera rečenica koje koriste ovu riječ.
+
+Pravila:
 - Svaka rečenica MAKSIMALNO 10 riječi.
 - Zajedno, rečenice trebaju pokriti SVA značenja riječi.
 - Koristi različite gramatičke oblike (padeže, vremena, vidove...) gdje je moguće.
 - Rečenice trebaju biti UPAMTLJIVE — koristi snažne vizuelne slike ili emocije.
-- SVAKO pojavljivanje ciljne riječi u SVAKOJ rečenici MORA biti omotano u {{{{c1::...}}}}. Nikada ne piši ciljnu riječ bez omotača."""
+- SVAKO pojavljivanje ciljne riječi u SVAKOJ rečenici MORA biti omotano u {{{{c1::...}}}}. Nikada ne piši ciljnu riječ bez omotača.
+
+Format izlaza (SAMO rečenice, bez numeracije, bez uvoda):
+Rečenica s {{{{c1::oblik1}}}}.<br>Rečenica s {{{{c1::oblik2}}}}.<br>Rečenica s {{{{c1::oblik3}}}}."""
 
 
 # --- Image prompt generation (for AI-generated images) ---
@@ -56,7 +66,7 @@ Zadatak:
 Napiši detaljan prompt na engleskom jeziku za generiranje slike koja:
 - jasno i nedvosmisleno vizualizira pojam,
 - stil prilagodi vrsti pojma:
-  - glagoli/radnje: strip, sekvenca ili scena s jasnom radnjom,
+  - glagoli/radnje: sekvenca ili scena s jasnom radnjom,
   - apstraktne imenice: konceptualna ili nadrealna ilustracija,
   - emocije: izražajni, slikarski stil,
   - idiomi/fraze: kreativna vizuelna metafora figurativnog značenja.

@@ -13,15 +13,18 @@ from bcs_anki.llm import (
 
 
 class TestGenerateDefinitionAndExamples:
-    def test_splits_on_primjeri_delimiter(self, mock_cfg, mock_openai_chat):
+    def test_separate_definition_and_examples(self, mock_cfg, mock_openai_chat):
         definition_resp = mock_openai_chat(
-            "DEFINICIJA:\n{{c1::primirje}} — privremeni prekid\nPRIMJERI:\n1. Sentence one.\n2. Sentence two.\n3. Sentence three."
+            "{{c1::primirje}} — privremeni prekid"
         )
         validation_resp = mock_openai_chat("primirje 90%\nprekid 7%\nmir 3%")
+        examples_resp = mock_openai_chat(
+            "Sentence one {{c1::primirje}}.<br>Sentence two {{c1::primirja}}.<br>Sentence three {{c1::primirju}}."
+        )
 
         with patch("bcs_anki.llm._get_client") as mock_client:
             mock_client.return_value.chat.completions.create.side_effect = [
-                definition_resp, validation_resp,
+                definition_resp, validation_resp, examples_resp,
             ]
             result = generate_definition_and_examples(mock_cfg, "primirje")
 
@@ -30,36 +33,41 @@ class TestGenerateDefinitionAndExamples:
         assert not result.definition_html.startswith("DEFINICIJA:")
         assert "Sentence one" in result.examples_html
 
-    def test_fallback_parsing_without_delimiter(self, mock_cfg, mock_openai_chat):
+    def test_strips_definicija_prefix(self, mock_cfg, mock_openai_chat):
         definition_resp = mock_openai_chat(
-            "Definition line\n1. Example one.\n2. Example two.\n3. Example three."
+            "DEFINICIJA:\n{{c1::test}} — definition line"
         )
-        # Validation will fail (no cloze to extract lemma, word is "test")
         validation_resp = mock_openai_chat("test 80%\nother 15%\nword 5%")
+        examples_resp = mock_openai_chat(
+            "Example with {{c1::test}}."
+        )
 
         with patch("bcs_anki.llm._get_client") as mock_client:
             mock_client.return_value.chat.completions.create.side_effect = [
-                definition_resp, validation_resp,
+                definition_resp, validation_resp, examples_resp,
             ]
             result = generate_definition_and_examples(mock_cfg, "test")
 
-        assert result.definition_html == "Definition line"
-        assert "Example one" in result.examples_html
+        assert result.definition_html.startswith("{{c1::test}}")
+        assert "Example" in result.examples_html
 
     def test_validation_triggers_refinement(self, mock_cfg, mock_openai_chat):
         definition_resp = mock_openai_chat(
-            "DEFINICIJA:\n{{c1::primirje}} — privremeni prekid\nPRIMJERI:\n1. S1.\n2. S2.\n3. S3."
+            "{{c1::primirje}} — privremeni prekid"
         )
         # Validation fails: top guess is wrong
         validation_resp = mock_openai_chat("prekid 60%\nprimirje 30%\nmir 10%")
-        # Refinement returns improved definition in full format
+        # Refinement returns improved definition
         refine_resp = mock_openai_chat(
             "{{c1::primirje}} (imenica, sr.) — privremeni prestanak neprijateljstava"
+        )
+        examples_resp = mock_openai_chat(
+            "S1 {{c1::primirje}}.<br>S2 {{c1::primirja}}.<br>S3 {{c1::primirju}}."
         )
 
         with patch("bcs_anki.llm._get_client") as mock_client:
             mock_client.return_value.chat.completions.create.side_effect = [
-                definition_resp, validation_resp, refine_resp,
+                definition_resp, validation_resp, refine_resp, examples_resp,
             ]
             result = generate_definition_and_examples(mock_cfg, "primirje")
 

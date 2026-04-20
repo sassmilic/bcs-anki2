@@ -31,9 +31,9 @@ class TestProcessWordSuccess:
 
         mock_gen.return_value = GeneratedText(
             definition_html="{{c1::primirje}} — def",
-            examples_html="1. Ex one.<br>2. Ex two.<br>3. Ex three.",
+            examples_html="1. Ex {{c1::one}}.<br>2. Ex {{c1::two}}.<br>3. Ex {{c1::three}}.",
         )
-        mock_img.return_value = ("primirje_abc123.png", tmp_path / "primirje_abc123.png")
+        mock_img.return_value = [("primirje_abc123.png", tmp_path / "primirje_abc123.png")]
 
         entry = WordEntry("primirje", None)
         result = _process_word(entry, mock_cfg, state, out_csv, progress_file)
@@ -55,9 +55,9 @@ class TestProcessWordSuccess:
         save_progress(progress_file, state)
 
         mock_gen.return_value = GeneratedText(
-            definition_html="def", examples_html="ex"
+            definition_html="{{c1::test}} — def", examples_html="Ex {{c1::test}}."
         )
-        mock_img.return_value = ("img.png", tmp_path / "img.png")
+        mock_img.return_value = [("img.png", tmp_path / "img.png")]
 
         _process_word(WordEntry("test", None), mock_cfg, state, out_csv, progress_file)
 
@@ -78,7 +78,7 @@ class TestProcessWordFailure:
         save_progress(progress_file, state)
 
         mock_gen.side_effect = RuntimeError("API error")
-        mock_img.return_value = ("img.png", tmp_path / "img.png")
+        mock_img.return_value = [("img.png", tmp_path / "img.png")]
 
         entry = WordEntry("fail_word", None)
         result = _process_word(entry, mock_cfg, state, out_csv, progress_file)
