@@ -5,9 +5,9 @@ import random
 import shutil
 import subprocess
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
@@ -27,6 +27,7 @@ from .llm import (
     generate_definition_and_examples,
     generate_image_prompt,
     generate_image_search_term,
+    resolve_lemma,
 )
 from .logging_utils import setup_logging
 from .progress import ProgressState, load_progress, mark_completed, mark_failed, progress_path_for
@@ -34,28 +35,56 @@ from .progress import ProgressState, load_progress, mark_completed, mark_failed,
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class WordEntry:
-    word: str
-    context: str | None
-
-
-def parse_word_line(line: str) -> WordEntry:
-    if "|" in line:
-        word, context = line.split("|", maxsplit=1)
-        return WordEntry(word=word.strip(), context=context.strip())
-    return WordEntry(word=line.strip(), context=None)
-
-
-def _load_app_config(config_path: Optional[str]) -> AppConfig:
+def _load_app_config(config_path: Optional[str], verbose: bool = False) -> AppConfig:
     path = Path(config_path).expanduser() if config_path else None
     cfg = load_config(path)
+    setup_logging(cfg.log_file, verbose=verbose)
     return cfg
 
 
-def _fetch_image(cfg: AppConfig, entry: WordEntry, word: str) -> list[tuple[str, Path]] | None:
+_failed_lock = threading.Lock()
+
+# Tracks lemmas currently being processed by other workers, so two raw inputs
+# that resolve to the same lemma don't both do the work.
+_lemma_lock = threading.Lock()
+_lemmas_in_progress: set[str] = set()
+
+
+def _ensure_failed_header(path: Path) -> None:
+    if path.exists():
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("word\treason\n", encoding="utf-8")
+
+
+def _summarize_exception(exc: BaseException, max_len: int = 160) -> str:
+    """Return a short, single-line description of an exception for the failed.tsv.
+
+    Strips verbose API payloads (anything after the first `{`, where Google/OpenAI
+    error JSON typically begins) and collapses whitespace. Full traceback still
+    goes to the log via logger.exception.
+    """
+    msg = str(exc)
+    brace = msg.find("{")
+    if brace > 0:
+        msg = msg[:brace].rstrip(" .:,-")
+    msg = " ".join(msg.split())
+    summary = f"{type(exc).__name__}: {msg}" if msg else type(exc).__name__
+    if len(summary) > max_len:
+        summary = summary[: max_len - 1] + "…"
+    return summary
+
+
+def _append_failed(path: Path, word: str, reason: str) -> None:
+    safe_reason = reason.replace("\t", " ").replace("\n", " ").replace("\r", " ")
+    with _failed_lock:
+        with path.open("a", encoding="utf-8") as f:
+            f.write(f"{word}\t{safe_reason}\n")
+
+
+def _fetch_image(cfg: AppConfig, word: str) -> list[tuple[str, Path]] | None:
     """Fetch or generate images for a word. Returns list of (filename, path) or None."""
-    img_source: ImageSource = decide_image_source(cfg, word, context=entry.context)
+    img_source: ImageSource = decide_image_source(cfg, word)
     img_filename = build_image_filename(word)
     img_path = cfg.temp_image_folder / img_filename
     cfg.temp_image_folder.mkdir(parents=True, exist_ok=True)
@@ -63,7 +92,7 @@ def _fetch_image(cfg: AppConfig, entry: WordEntry, word: str) -> list[tuple[str,
     if img_source == "stock":
         logger.info("Using stock image for '%s'", word)
         try:
-            search_term_en = generate_image_search_term(cfg, word, context=entry.context)
+            search_term_en = generate_image_search_term(cfg, word)
             logger.info("Image search term (EN) for '%s': %s", word, search_term_en)
             paths = fetch_stock_image(cfg, search_term_en, img_path)
             return [(p.name, p) for p in paths]
@@ -77,7 +106,7 @@ def _fetch_image(cfg: AppConfig, entry: WordEntry, word: str) -> list[tuple[str,
 
     if img_source == "ai":
         logger.info("Using AI image for '%s'", word)
-        img_prompt = generate_image_prompt(cfg, word, context=entry.context)
+        img_prompt = generate_image_prompt(cfg, word)
         logger.info("Image prompt for '%s': %s", word, img_prompt)
         try:
             generate_ai_image(cfg, img_prompt, img_path)
@@ -86,7 +115,7 @@ def _fetch_image(cfg: AppConfig, entry: WordEntry, word: str) -> list[tuple[str,
                 "AI image rejected by safety filter for '%s', regenerating prompt and retrying: %s",
                 word, exc,
             )
-            img_prompt = generate_image_prompt(cfg, word, context=entry.context)
+            img_prompt = generate_image_prompt(cfg, word)
             logger.info("Retry image prompt for '%s': %s", word, img_prompt)
             try:
                 generate_ai_image(cfg, img_prompt, img_path)
@@ -99,24 +128,80 @@ def _fetch_image(cfg: AppConfig, entry: WordEntry, word: str) -> list[tuple[str,
     return [(img_filename, img_path)]
 
 
+def _parse_review_csv(text: str) -> list[dict]:
+    """Group an Anki-style CSV into one entry per word.
+
+    Each word produces 0-2 Cloze rows followed by 0-1 Basic row. The Basic row
+    carries the lemma in column 2; Cloze rows immediately preceding it belong
+    to the same word. Cloze rows with no following Basic (image was skipped)
+    are emitted as orphans with word="(no image)".
+    """
+    lines = text.splitlines()
+    data_lines = [l for l in lines if l.strip() and not l.startswith("#")]
+
+    def _emit(words_list: list, clozes: list, basic_word: str, image_file: str) -> None:
+        words_list.append({
+            "word": basic_word,
+            "definition": clozes[0] if len(clozes) > 0 else "",
+            "examples": clozes[1] if len(clozes) > 1 else "",
+            "image_file": image_file,
+        })
+
+    words: list[dict] = []
+    pending_clozes: list[str] = []
+    for line in data_lines:
+        parts = line.split("\t")
+        if not parts:
+            continue
+        note_type = parts[0]
+        if note_type == "Cloze":
+            if len(pending_clozes) >= 2:
+                _emit(words, pending_clozes, "(no image)", "")
+                pending_clozes = []
+            pending_clozes.append(parts[1] if len(parts) > 1 else "")
+        elif note_type == "Basic (and reversed card)":
+            word = parts[2] if len(parts) > 2 else "?"
+            img_field = parts[1] if len(parts) > 1 else ""
+            img_file = ""
+            if 'src="' in img_field:
+                img_file = img_field.split('src="')[1].split('"')[0]
+            _emit(words, pending_clozes, word, img_file)
+            pending_clozes = []
+
+    if pending_clozes:
+        _emit(words, pending_clozes, "(no image)", "")
+
+    return words
+
+
 def _process_word(
-    entry: WordEntry,
+    raw_word: str,
     cfg: AppConfig,
     state: ProgressState,
     out_csv: Path,
     progress_file: Path,
+    failed_csv: Path,
 ) -> bool:
-    """Process a single word with within-word parallelism. Returns True on success."""
-    word = entry.word
-    logger.info("Processing word: %s", word)
+    """Process a single word. Resolves the lemma first, then uses it for all downstream work."""
+    logger.info("Processing input: %s", raw_word)
+    word = raw_word
 
+    claimed = False
     try:
-        # Run definition and image generation in parallel
+        word = resolve_lemma(cfg, raw_word)
+        if word != raw_word:
+            logger.info("Resolved lemma '%s' -> '%s'", raw_word, word)
+
+        with _lemma_lock:
+            if word in state.completed_words or word in _lemmas_in_progress:
+                logger.info("Skipping '%s': lemma already completed or in progress", word)
+                return True
+            _lemmas_in_progress.add(word)
+            claimed = True
+
         with ThreadPoolExecutor(max_workers=2) as inner_pool:
-            def_future = inner_pool.submit(
-                generate_definition_and_examples, cfg, word, context=entry.context
-            )
-            img_future = inner_pool.submit(_fetch_image, cfg, entry, word)
+            def_future = inner_pool.submit(generate_definition_and_examples, cfg, word)
+            img_future = inner_pool.submit(_fetch_image, cfg, word)
 
             gen = def_future.result()
             img_result = img_future.result()
@@ -157,8 +242,13 @@ def _process_word(
 
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to process word '%s': %s", word, exc)
+        _append_failed(failed_csv, word, _summarize_exception(exc))
         mark_failed(progress_file, state, word)
         return False
+    finally:
+        if claimed:
+            with _lemma_lock:
+                _lemmas_in_progress.discard(word)
 
 
 @click.group()
@@ -191,17 +281,16 @@ def generate(
     append: bool,
 ) -> None:
     """Generate Anki-ready CSV and images from a word list."""
-    cfg = _load_app_config(str(config_path) if config_path else None)
+    cfg = _load_app_config(str(config_path) if config_path else None, verbose=verbose)
     if anki_media:
         cfg.anki_media_folder = anki_media.expanduser()
     if workers is not None:
         cfg.max_workers = workers
 
-    setup_logging(cfg.log_file, verbose=verbose)
-
     # Log effective (sanitized) configuration
     safe_cfg = {
         "openai_api_key": "set" if cfg.openai_api_key else "not set",
+        "gemini_api_key": "set" if cfg.gemini_api_key else "not set",
         "image_generation_model": cfg.image_generation_model,
         "image_size": cfg.image_size,
         "stock_image_api": cfg.stock_image_api or "none",
@@ -213,6 +302,7 @@ def generate(
         "rate_limit_delay_seconds": cfg.rate_limit_delay_seconds,
         "tags": cfg.tags,
         "llm_model": cfg.llm_model,
+        "gemini_model": cfg.gemini_model,
         "max_workers": cfg.max_workers,
     }
     logger.info("Loaded configuration: %s", safe_cfg)
@@ -223,9 +313,14 @@ def generate(
         logger.info("Removed existing output file: %s", out_csv)
     ensure_header(out_csv)
 
+    failed_csv = cfg.output_folder / f"{input_file.stem}_failed.tsv"
+    if not append and failed_csv.exists():
+        failed_csv.unlink()
+    _ensure_failed_header(failed_csv)
+
     progress_file = progress_path_for(input_file, cfg.output_folder)
-    entries = [parse_word_line(line) for line in input_file.read_text(encoding="utf-8").splitlines() if line.strip()]
-    total_words = len(entries)
+    words = [s for line in input_file.read_text(encoding="utf-8").splitlines() if (s := line.strip())]
+    total_words = len(words)
 
     state: ProgressState
     if fresh or not resume or not progress_file.exists():
@@ -255,21 +350,21 @@ def generate(
 
     click.echo(f"Processing {total_words} words from {input_file} (already done: {already_done})...")
 
-    # Filter to words that still need processing
-    pending = [e for e in entries if e.word not in state.completed_words]
+    # Cheap pre-filter on raw input. The lemma may differ from the input, so
+    # _process_word does a second dedup check after resolving the lemma.
+    pending = [w for w in words if w not in state.completed_words]
 
     if dry_run:
-        for entry in pending:
-            ctx_info = f" (context: {entry.context})" if entry.context else ""
-            click.echo(f"[DRY-RUN] Would process: {entry.word}{ctx_info}")
+        for w in pending:
+            click.echo(f"[DRY-RUN] Would process: {w}")
     else:
         effective_workers = min(cfg.max_workers, len(pending)) if pending else 1
         click.echo(f"Using {effective_workers} workers for {len(pending)} remaining words.")
 
         with ThreadPoolExecutor(max_workers=effective_workers) as pool:
             future_to_word = {
-                pool.submit(_process_word, entry, cfg, state, out_csv, progress_file): entry.word
-                for entry in pending
+                pool.submit(_process_word, w, cfg, state, out_csv, progress_file, failed_csv): w
+                for w in pending
             }
 
             for future in as_completed(future_to_word):
@@ -312,6 +407,7 @@ def generate(
     click.echo("Done.")
     if state.failed_words:
         click.echo(f"Failed words: {', '.join(state.failed_words)}")
+        click.echo(f"See {failed_csv} for failure reasons.")
 
 
 @main.command("copy-media")
@@ -395,36 +491,7 @@ def validate(csv_file: Path) -> None:
 def review(csv_file: Path, image_dir: Optional[Path], sample: Optional[int], reject_file: Optional[Path]) -> None:
     """Review generated flashcards for subjective quality."""
     text = csv_file.read_text(encoding="utf-8")
-    lines = text.splitlines()
-
-    # Skip header lines (lines starting with #)
-    data_lines = [l for l in lines if l.strip() and not l.startswith("#")]
-
-    # Group rows by word — every 3 rows = one word (def, examples, image)
-    words: list[dict] = []
-    for i in range(0, len(data_lines), 3):
-        group = data_lines[i : i + 3]
-        if len(group) < 3:
-            break
-        def_parts = group[0].split("\t")
-        ex_parts = group[1].split("\t")
-        img_parts = group[2].split("\t")
-
-        # Extract the word from the image row (field2)
-        word = img_parts[2] if len(img_parts) > 2 else "?"
-
-        # Extract image filename from the img tag
-        img_field = img_parts[1] if len(img_parts) > 1 else ""
-        img_file = ""
-        if 'src="' in img_field:
-            img_file = img_field.split('src="')[1].split('"')[0]
-
-        words.append({
-            "word": word,
-            "definition": def_parts[1] if len(def_parts) > 1 else "",
-            "examples": ex_parts[1] if len(ex_parts) > 1 else "",
-            "image_file": img_file,
-        })
+    words = _parse_review_csv(text)
 
     if not words:
         click.echo("No words found in CSV.")
@@ -448,19 +515,11 @@ def review(csv_file: Path, image_dir: Optional[Path], sample: Optional[int], rej
             img_display = str(image_dir / entry["image_file"])
         click.echo(f"Image:      {img_display}")
 
-        while True:
+        choice = ""
+        while choice not in ("a", "r", "q"):
             click.echo("\n[a]ccept  [r]eject  [o]pen image  [q]uit")
             choice = click.getchar().lower()
-
-            if choice == "a":
-                accepted += 1
-                reviewed += 1
-                break
-            elif choice == "r":
-                rejected.append(entry["word"])
-                reviewed += 1
-                break
-            elif choice == "o":
+            if choice == "o":
                 if image_dir and entry["image_file"]:
                     img_path = image_dir / entry["image_file"]
                     if img_path.exists():
@@ -474,14 +533,15 @@ def review(csv_file: Path, image_dir: Optional[Path], sample: Optional[int], rej
                         click.echo(f"  Image not found: {img_path}")
                 else:
                     click.echo("  No image directory specified (use --image-dir).")
-            elif choice == "q":
-                click.echo("\nQuitting review.")
-                reviewed += 0  # current word not counted
-                break
-        else:
-            continue
 
-        if choice == "q":
+        if choice == "a":
+            accepted += 1
+            reviewed += 1
+        elif choice == "r":
+            rejected.append(entry["word"])
+            reviewed += 1
+        else:  # quit
+            click.echo("\nQuitting review.")
             break
 
     # Write rejected words

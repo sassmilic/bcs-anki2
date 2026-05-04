@@ -5,7 +5,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from bcs_anki.cli import WordEntry
 from bcs_anki.config import AppConfig
 
 
@@ -14,9 +13,11 @@ def mock_cfg(tmp_path: Path) -> AppConfig:
     """AppConfig with test values and fake API keys."""
     return AppConfig(
         openai_api_key="test-openai-key",
+        gemini_api_key="test-gemini-key",
         stock_image_api_key="test-stock-key",
-        image_generation_model="dall-e-3",
+        image_generation_model="gpt-image-2",
         image_size="1024x1024",
+        image_quality="medium",
         stock_image_api="unsplash",
         anki_media_folder=tmp_path / "anki_media",
         output_folder=tmp_path / "output",
@@ -25,6 +26,7 @@ def mock_cfg(tmp_path: Path) -> AppConfig:
         rate_limit_delay_seconds=0.0,
         tags="test",
         llm_model="gpt-4.1-mini",
+        gemini_model="gemini-2.5-pro",
         max_workers=2,
     )
 
@@ -45,21 +47,15 @@ def mock_openai_chat():
 
 @pytest.fixture()
 def mock_openai_image():
-    """Returns a mock OpenAI images.generate response."""
-    def _make(url: str = "https://example.com/image.png") -> MagicMock:
+    """Returns a mock OpenAI images.generate response (gpt-image-2 base64 shape)."""
+    import base64
+
+    def _make(image_bytes: bytes = b"AI_IMAGE_DATA") -> MagicMock:
         datum = MagicMock()
-        datum.url = url
+        datum.b64_json = base64.b64encode(image_bytes).decode("ascii")
         resp = MagicMock()
         resp.data = [datum]
         return resp
     return _make
 
 
-@pytest.fixture()
-def sample_word_entry() -> WordEntry:
-    return WordEntry("primirje", None)
-
-
-@pytest.fixture()
-def sample_word_entry_with_context() -> WordEntry:
-    return WordEntry("zamak", "dvorac, ne brava")

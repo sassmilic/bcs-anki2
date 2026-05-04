@@ -10,16 +10,19 @@ from bcs_anki.config import AppConfig, load_config
 
 
 class TestDefaultConfig:
-    @patch.dict("os.environ", {"OPENAI_API_KEY": "k1", "UNSPLASH_API_KEY": "k2"}, clear=False)
+    @patch.dict("os.environ", {"OPENAI_API_KEY": "k1", "UNSPLASH_API_KEY": "k2", "GEMINI_API_KEY": "g1"}, clear=False)
     def test_defaults(self):
         cfg = load_config(None)
         assert isinstance(cfg, AppConfig)
         assert cfg.max_workers == 4
         assert cfg.llm_model == "gpt-4.1-mini"
-        assert cfg.image_generation_model == "dall-e-3"
+        assert cfg.gemini_model == "gemini-2.5-pro"
+        assert cfg.image_generation_model == "gpt-image-2"
+        assert cfg.image_quality == "medium"
         assert cfg.tags == "bcs naski"
         assert cfg.rate_limit_delay_seconds == 2.0
         assert cfg.openai_api_key == "k1"
+        assert cfg.gemini_api_key == "g1"
         assert cfg.stock_image_api == "unsplash"
         assert cfg.stock_image_api_key == "k2"
 

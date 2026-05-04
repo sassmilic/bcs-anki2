@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Copy this file to run.sh and fill in your API keys. run.sh is gitignored.
+# Usage: ./run.sh [words-file]   (defaults to words.txt)
+set -euo pipefail
+
+# --- Required ---
+export OPENAI_API_KEY="sk-REPLACE_ME"
+
+# --- Stock image provider (pick ONE; first non-empty wins) ---
+export UNSPLASH_API_KEY="REPLACE_ME"
+# export PEXELS_API_KEY=""
+# export PIXABAY_API_KEY=""
+
+# --- Gemini (used by the in-progress Gemini pipeline) ---
+export GEMINI_API_KEY="REPLACE_ME"
+
+WORDS_FILE="${1:-words.txt}"
+
+bcs-anki generate "$WORDS_FILE"
+bcs-anki copy-media

@@ -5,11 +5,31 @@ Each pair is (system_prompt, user_prompt_template).
 User prompt templates use {word} for substitution.
 """
 
+# --- Lemma resolution ---
+
+LEMMA_SYSTEM = (
+    "Ti si iskusni leksikograf za bosanski/hrvatski/srpski jezik (ijekavski)."
+)
+
+LEMMA_USER = """\
+Vrati KANONSKI OBLIK (lemu) zadane riječi ili izraza.
+
+Ulaz: "{word}"
+
+Pravila:
+- Ako je riječ pogrešno napisana ili bez dijakritičkih znakova, tiho ispravi.
+- Glagol → infinitiv (npr. "vidim" → "vidjeti").
+- Imenica/pridjev → nominativ jednine, muški rod (osim ako je riječ samo ženskog ili srednjeg roda).
+- Izraz/fraza → ostavi u uobičajenom rječničkom obliku.
+
+Vrati SAMO jednu riječ ili izraz, bez objašnjenja, navodnika ili prefiksa."""
+
+
 # --- Definition ---
 
 DEFINITION_SYSTEM = (
     "Ti si iskusni leksikograf za bosanski/hrvatski/srpski jezik (ijekavski). "
-    "Odgovaraj isključivo na BHS jeziku, ijekavski, bez objašnjenja na engleskom."
+    "Odgovaraj isključivo na BHS jeziku, ijekavski, bosanski dijalekt, bez objašnjenja na engleskom."
 )
 
 DEFINITION_USER = """\
@@ -19,58 +39,118 @@ Zadatak:
 1) Prepoznaj KANONSKI OBLIK (lemu). Ako je riječ pogrešno napisana ili bez dijakritičkih znakova, tiho koristi ispravan oblik bez napomene.
 2) Odredi gramatičku kategoriju:
    - imenice: vrsta + rod (npr. "imenica, ž.")
-   - glagoli: OBAVEZNO vrsta + "ja" oblik u zagradi, omotan u {{{{c1::...}}}} (npr. "glagol, ja {{{{c1::vidim}}}}"). "Ja" oblik MORA biti uključen za SVAKI glagol.
+   - glagoli: OBAVEZNO vrsta + "ja" oblik u zagradi, omotan u {{{{c1::...}}}} (npr. "glagol, {{{{c1::vidim}}}}"). 
    - ostalo: samo vrsta (npr. "pridjev", "prilog", "veznik")
    - Samo ako je riječ NEOBIČNA, dodaj kratku napomenu (npr. "arhaično", "pretežno u hrvatskom").
 3) Napiši KRATKU definiciju (maksimalno 15 riječi) na BHS jeziku. Ako ima više značenja, odvoji ih tačkom-zarezom.
 
-Format izlaza (SAMO jedan red, bez oznake "DEFINICIJA:"):
-{{{{c1::KANONSKI_OBLIK}}}} (GRAMATIKA) — definicija; drugo značenje
+Format:
+{{{{c1::KANONSKI_OBLIK}}}} (GRAMATIKA) — definicija; drugo značenje (ako postoji)
 
 Primjer izlaza:
-{{{{c1::viditi}}}} (glagol, ja {{{{c1::vidim}}}}) — opažati očima; shvatiti, razumjeti"""
+{{{{c1::raspiriti}}}} (glagol, {{{{c1::raspirim}}}}) — podstaknuti vatru da jače gori; pojačati emocije ili interes"""
 
 
 # --- Examples ---
 
 EXAMPLES_SYSTEM = DEFINITION_SYSTEM
 
-EXAMPLES_USER = """\
+EXAMPLES_USER = """
 Zadatak:
 - Za zadanu riječ ili izraz: "{word}"
 
 Napiši 3 primjera rečenica koje koriste ovu riječ.
 
 Pravila:
-- Svaka rečenica MAKSIMALNO 10 riječi.
-- Zajedno, rečenice trebaju pokriti SVA značenja riječi.
-- Koristi različite gramatičke oblike (padeže, vremena, vidove...) gdje je moguće.
-- Rečenice trebaju biti UPAMTLJIVE — koristi snažne vizuelne slike ili emocije.
-- SVAKO pojavljivanje ciljne riječi u SVAKOJ rečenici MORA biti omotano u {{{{c1::...}}}}. Nikada ne piši ciljnu riječ bez omotača.
+1. KRATKOĆA: Svaka rečenica MAKSIMALNO 15 riječi.
+2. SEMANTIKA: Zajedno, rečenice trebaju pokriti što više značenja riječi (npr. doslovno i preneseno).
+3. GRAMATIKA: Koristi različite gramatičke oblike (padeže, vremena, vidove) i osiguraj da su povratni glagoli (se) ispravno upotrijebljeni.
+4. KVALITET: Rečenice trebaju biti prirodne (native-like) i UPAMTLJIVE — koristi snažne vizuelne slike ili emocije. Izbjegavaj generičke primjere.
+5. CLOZE: SVAKO pojavljivanje ciljne riječi u SVAKOJ rečenici MORA biti omotano u {{{{c1::...}}}}.
+6. KONTROLA: Ako riječ ima pejorativno (uvredljivo) ili arhaično značenje, osiguraj da rečenica to jasno odražava kroz kontekst.
 
-Format izlaza (SAMO rečenice, bez numeracije, bez uvoda):
-Rečenica s {{{{c1::oblik1}}}}.<br>Rečenica s {{{{c1::oblik2}}}}.<br>Rečenica s {{{{c1::oblik3}}}}."""
+Format izlaza (isključivo HTML bullet points, bez numeracije, bez uvoda):
+<ul>
+  <li>Gasiš {{{{c1::vatru}}}} benzinom ako misliš da ćeš tako riješiti taj sukob.</li>
+  <li>Nakon dugog uspona, napokon smo naložili {{{{c1::vatre}}}} da se ugrijemo.</li>
+  <li>Njezin je nastup bio pun {{{{c1::vatre}}}} i neobuzdane energije.</li>
+</ul>
+"""
+
+
+# --- Gemini review: definition ---
+
+REVIEW_DEFINITION_SYSTEM = (
+    "Ti si izvorni govornik bosanskog/hrvatskog/srpskog jezika (ijekavski) i iskusni leksikograf. "
+    "Tvoj zadatak je validirati definicije rečnika napisane od strane drugog AI modela."
+)
+
+REVIEW_DEFINITION_USER = """\
+Riječ koja se definira: "{word}"
+
+Predložena definicija (od drugog AI modela):
+{definition}
+
+Provjeri:
+1. Da li je definicija činjenično tačna i nedvosmisleno opisuje upravo riječ "{word}" (a ne neku sličnu riječ)?
+2. Da li je gramatička kategorija (vrsta riječi, rod, "ja"-oblik za glagole) ispravna?
+3. Da li je zadržana izvorna struktura: {{{{c1::lema}}}} (gramatika) — definicija; drugo značenje (ako postoji)?
+
+PRAVILA ODGOVORA — IZUZETNO VAŽNO:
+- Ako je definicija u potpunosti ispravna, odgovori SAMO znakom: ✓
+  (jedan znak, bez ikakvog drugog teksta, bez objašnjenja, bez razmaka)
+- Ako je definicija pogrešna, odgovori ISKLJUČIVO ispravljenom verzijom definicije
+  (jedan red, isti format kao izvorna, sa minimalnim brojem izmjena potrebnih da bude tačna).
+  Ne dodaji komentar, prefiks "Ispravka:", niti bilo kakav drugi tekst."""
+
+
+# --- Gemini review: examples ---
+
+REVIEW_EXAMPLES_SYSTEM = (
+    "Ti si izvorni govornik bosanskog/hrvatskog/srpskog jezika (ijekavski). "
+    "Tvoj zadatak je validirati primjere rečenica koje je napisao drugi AI model."
+)
+
+REVIEW_EXAMPLES_USER = """\
+Ciljna riječ: "{word}"
+
+Predloženi primjeri (HTML lista):
+{examples}
+
+Provjeri svaku rečenicu po sljedećim kriterijumima:
+1. Gramatička ispravnost (padeži, vremena, vidovi, povratni glagoli "se").
+2. Semantička prirodnost — da li bi izvorni govornik to zaista rekao?
+3. Tolerancija za kreativnost: dozvoljene su neobične, ekspresivne rečenice koliko bi ih napisao kreativan pisac. Odbaci samo ono što izvorni govornik NE BI rekao.
+4. Da li su sva pojavljivanja ciljne riječi i dalje omotana u {{{{c1::...}}}}?
+
+PRAVILA ODGOVORA — IZUZETNO VAŽNO:
+- Ako su SVE rečenice ispravne, odgovori SAMO znakom: ✓
+  (jedan znak, bez ikakvog drugog teksta)
+- Ako je bar jedna rečenica neispravna, odgovori ISKLJUČIVO ispravljenom verzijom CIJELE HTML liste
+  (<ul><li>...</li>...</ul>), sa minimalnim brojem izmjena, zadržavajući sve {{{{c1::...}}}} markere.
+  Ne dodaji komentar niti bilo kakav drugi tekst."""
 
 
 # --- Image prompt generation (for AI-generated images) ---
 
 IMAGE_PROMPT_SYSTEM = (
-    "Ti si kreativni dizajner koji osmišljava upute za generiranje slika (prompte) za model poput DALL-E. "
+    "Ti si kreativni dizajner koji osmišljava upute za generiranje slika (prompte) za AI generator slika. "
     "Ne koristi tekst u samoj slici. Piši na engleskom jeziku."
 )
 
 IMAGE_PROMPT_USER = """\
-Zadatak:
-- Riječ ili izraz (na BHS, ijekavski): "{word}"
+Task:
+- Target word (BCS): "{word}"
 
-Napiši detaljan prompt na engleskom jeziku za generiranje slike koja:
-- jasno i nedvosmisleno vizualizira pojam,
-- stil prilagodi vrsti pojma:
-  - glagoli/radnje: sekvenca ili scena s jasnom radnjom,
-  - apstraktne imenice: konceptualna ili nadrealna ilustracija,
-  - emocije: izražajni, slikarski stil,
-  - idiomi/fraze: kreativna vizuelna metafora figurativnog značenja.
-Ne pominji riječi "text", "caption" niti upotrebljavaj natpise u slici."""
+Create an English prompt for an AI image generator that:
+1. Visualizes the meaning of the word "{word}" clearly and unambiguously.
+2. Adapt the style:
+   - Verbs/Actions: Dynamic scene showing the movement or interaction.
+   - Abstract Nouns: Conceptual, metaphorical; get creative, but stay true to the meaning of the word.
+   - Emotions: Atmospheric, capturing emotion by focusing on lighting, colors, and facial expressions.
+   - Idioms: Creative visual metaphors for the figurative meaning.
+3. Composition: Focus on a single, clear subject to ensure the card remains readable at a glance.
+5. Constraint: NO text, letters, or captions in the image. Do not use the word "{word}" as an instruction for the image content."""
 
 
 # --- Image search term translation (for stock images) ---
@@ -116,44 +196,3 @@ or unhelpful.\
 When in doubt, prefer "ai"."""
 
 
-# --- Definition validation (reverse-guess) ---
-
-VALIDATE_DEFINITION_SYSTEM = (
-    "Ti si iskusni leksikograf za bosanski/hrvatski/srpski jezik (ijekavski)."
-)
-
-VALIDATE_DEFINITION_USER = """\
-Data ti je definicija jedne BHS riječi (ijekavski). Pogodi koja je riječ.
-
-Definicija: "{definition}"
-
-Vrati TAČNO 3 kandidata, poredana od najvjerovatnijeg ka najmanje vjerovatnom.
-Format: jedan kandidat po redu, sa procentom sigurnosti, bez dodatnog objašnjenja.
-
-Primjer formata:
-primirje 85%
-prekid 10%
-mir 5%"""
-
-
-# --- Definition refinement ---
-
-REFINE_DEFINITION_SYSTEM = DEFINITION_SYSTEM
-
-REFINE_DEFINITION_USER = """\
-Sljedeća definicija za riječ "{word}" nije dovoljno precizna — čitaoci je ne mogu \
-jednoznačno povezati s pravom riječju.
-
-Trenutna definicija: "{definition}"
-Pogrešne pretpostavke čitaoca: {wrong_guesses}
-
-Prepravi definiciju tako da jasnije i preciznije upućuje na "{word}".
-Definicija mora biti kratka (~10 riječi). Odvoji značenja tačkom-zarezom.
-
-Vrati SAMO jedan red u ovom formatu (bez oznake "DEFINICIJA:" i bez primjera):
-{{{{c1::KANONSKI_OBLIK}}}} (GRAMATIKA) — definicija; drugo značenje"""
-
-
-# --- Context addendum (appended to any user prompt when context is provided) ---
-
-CONTEXT_ADDENDUM = '\n\nKontekst (primjer u kojem se riječ koristi): "{context}"'

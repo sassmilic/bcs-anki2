@@ -13,12 +13,14 @@ from dotenv import load_dotenv
 class AppConfig:
     # API keys (from .env / environment only)
     openai_api_key: Optional[str]
+    gemini_api_key: Optional[str]
     stock_image_api: Optional[str]
     stock_image_api_key: Optional[str]
 
     # App settings
     image_generation_model: str
     image_size: str
+    image_quality: str
     anki_media_folder: Path
     output_folder: Path
     temp_image_folder: Path
@@ -26,13 +28,15 @@ class AppConfig:
     rate_limit_delay_seconds: float
     tags: str
     llm_model: str
+    gemini_model: str
     max_workers: int
 
 
 DEFAULT_CONFIG_YAML = """\
 # Image generation
-image_generation_model: "dall-e-3"
+image_generation_model: "gpt-image-2"
 image_size: "1024x1024"
+image_quality: "medium"
 
 # Paths
 anki_media_folder: "~/Library/Application Support/Anki2/User 1/collection.media"
@@ -47,6 +51,9 @@ max_workers: 4
 
 # LLM model for definitions/sentences
 llm_model: "gpt-4.1-mini"
+
+# Gemini reviewer model
+gemini_model: "gemini-2.5-pro"
 """
 
 
@@ -72,6 +79,7 @@ def _load_api_keys() -> dict[str, Optional[str]]:
 
     return {
         "openai_api_key": os.getenv("OPENAI_API_KEY"),
+        "gemini_api_key": os.getenv("GEMINI_API_KEY"),
         "stock_image_api": stock_image_api,
         "stock_image_api_key": stock_image_api_key,
     }
@@ -98,10 +106,12 @@ def load_config(path: Optional[Path]) -> AppConfig:
 
     return AppConfig(
         openai_api_key=keys["openai_api_key"],
+        gemini_api_key=keys["gemini_api_key"],
         stock_image_api=keys["stock_image_api"],
         stock_image_api_key=keys["stock_image_api_key"],
-        image_generation_model=data.get("image_generation_model", "dall-e-3"),
+        image_generation_model=data.get("image_generation_model", "gpt-image-2"),
         image_size=data.get("image_size", "1024x1024"),
+        image_quality=data.get("image_quality", "medium"),
         anki_media_folder=Path(data.get("anki_media_folder", "./collection.media")).expanduser(),
         output_folder=Path(data.get("output_folder", "./output")).expanduser(),
         temp_image_folder=Path(data.get("temp_image_folder", "./temp_images")).expanduser(),
@@ -109,5 +119,6 @@ def load_config(path: Optional[Path]) -> AppConfig:
         rate_limit_delay_seconds=float(data.get("rate_limit_delay_seconds", 2)),
         tags=str(data.get("tags", "bcs naski")),
         llm_model=data.get("llm_model", "gpt-4.1-mini"),
+        gemini_model=data.get("gemini_model", "gemini-2.5-pro"),
         max_workers=int(data.get("max_workers", 4)),
     )

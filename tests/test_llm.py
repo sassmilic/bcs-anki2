@@ -1,6 +1,7 @@
 """Tier 3: LLM response parsing tests (mocked OpenAI)."""
 from __future__ import annotations
 
+from dataclasses import replace
 from unittest.mock import MagicMock, patch
 
 from bcs_anki.llm import (
@@ -9,22 +10,38 @@ from bcs_anki.llm import (
     generate_definition_and_examples,
     generate_image_prompt,
     generate_image_search_term,
+    resolve_lemma,
 )
 
 
+class TestResolveLemma:
+    def test_returns_bare_lemma(self, mock_cfg, mock_openai_chat):
+        resp = mock_openai_chat("vidjeti")
+        with patch("bcs_anki.llm._get_client") as mock_client:
+            mock_client.return_value.chat.completions.create.return_value = resp
+            assert resolve_lemma(mock_cfg, "vidim") == "vidjeti"
+
+    def test_strips_quotes_and_whitespace(self, mock_cfg, mock_openai_chat):
+        resp = mock_openai_chat('  "primirje"  \nextra line ignored')
+        with patch("bcs_anki.llm._get_client") as mock_client:
+            mock_client.return_value.chat.completions.create.return_value = resp
+            assert resolve_lemma(mock_cfg, "primirja") == "primirje"
+
+
 class TestGenerateDefinitionAndExamples:
-    def test_separate_definition_and_examples(self, mock_cfg, mock_openai_chat):
+    @patch("bcs_anki.llm.review_examples", side_effect=lambda cfg, w, html: html)
+    @patch("bcs_anki.llm.review_definition", side_effect=lambda cfg, w, html: html)
+    def test_separate_definition_and_examples(self, _mock_def, _mock_ex, mock_cfg, mock_openai_chat):
         definition_resp = mock_openai_chat(
             "{{c1::primirje}} — privremeni prekid"
         )
-        validation_resp = mock_openai_chat("primirje 90%\nprekid 7%\nmir 3%")
         examples_resp = mock_openai_chat(
             "Sentence one {{c1::primirje}}.<br>Sentence two {{c1::primirja}}.<br>Sentence three {{c1::primirju}}."
         )
 
         with patch("bcs_anki.llm._get_client") as mock_client:
             mock_client.return_value.chat.completions.create.side_effect = [
-                definition_resp, validation_resp, examples_resp,
+                definition_resp, examples_resp,
             ]
             result = generate_definition_and_examples(mock_cfg, "primirje")
 
@@ -33,47 +50,40 @@ class TestGenerateDefinitionAndExamples:
         assert not result.definition_html.startswith("DEFINICIJA:")
         assert "Sentence one" in result.examples_html
 
-    def test_strips_definicija_prefix(self, mock_cfg, mock_openai_chat):
-        definition_resp = mock_openai_chat(
-            "DEFINICIJA:\n{{c1::test}} — definition line"
-        )
-        validation_resp = mock_openai_chat("test 80%\nother 15%\nword 5%")
-        examples_resp = mock_openai_chat(
-            "Example with {{c1::test}}."
-        )
+    @patch("bcs_anki.llm.review_examples", side_effect=lambda cfg, w, html: html.replace("primirja", "primirje"))
+    @patch("bcs_anki.llm.review_definition", side_effect=lambda cfg, w, html: html)
+    def test_gemini_correction_applied(self, _mock_def, _mock_ex, mock_cfg, mock_openai_chat):
+        """Gemini's correction should replace OpenAI's output when reviewer changed it."""
+        definition_resp = mock_openai_chat("{{c1::primirje}} — definicija")
+        examples_resp = mock_openai_chat("<ul><li>Greška u {{c1::primirja}}.</li></ul>")
 
         with patch("bcs_anki.llm._get_client") as mock_client:
             mock_client.return_value.chat.completions.create.side_effect = [
-                definition_resp, validation_resp, examples_resp,
-            ]
-            result = generate_definition_and_examples(mock_cfg, "test")
-
-        assert result.definition_html.startswith("{{c1::test}}")
-        assert "Example" in result.examples_html
-
-    def test_validation_triggers_refinement(self, mock_cfg, mock_openai_chat):
-        definition_resp = mock_openai_chat(
-            "{{c1::primirje}} — privremeni prekid"
-        )
-        # Validation fails: top guess is wrong
-        validation_resp = mock_openai_chat("prekid 60%\nprimirje 30%\nmir 10%")
-        # Refinement returns improved definition
-        refine_resp = mock_openai_chat(
-            "{{c1::primirje}} (imenica, sr.) — privremeni prestanak neprijateljstava"
-        )
-        examples_resp = mock_openai_chat(
-            "S1 {{c1::primirje}}.<br>S2 {{c1::primirja}}.<br>S3 {{c1::primirju}}."
-        )
-
-        with patch("bcs_anki.llm._get_client") as mock_client:
-            mock_client.return_value.chat.completions.create.side_effect = [
-                definition_resp, validation_resp, refine_resp, examples_resp,
+                definition_resp, examples_resp,
             ]
             result = generate_definition_and_examples(mock_cfg, "primirje")
 
-        assert "{{c1::primirje}}" in result.definition_html
-        assert "neprijateljstava" in result.definition_html
-        assert "S1" in result.examples_html
+        assert "primirja" not in result.examples_html
+        assert "primirje" in result.examples_html
+
+    def test_skips_gemini_when_no_api_key(self, mock_cfg, mock_openai_chat):
+        """Without GEMINI_API_KEY, OpenAI output is returned untouched, no review call."""
+        no_gemini = replace(mock_cfg, gemini_api_key=None)
+        definition_resp = mock_openai_chat("{{c1::primirje}} — direct")
+        examples_resp = mock_openai_chat("<ul><li>Direct {{c1::primirje}}.</li></ul>")
+
+        with patch("bcs_anki.llm.review_definition") as mock_def, \
+             patch("bcs_anki.llm.review_examples") as mock_ex, \
+             patch("bcs_anki.llm._get_client") as mock_client:
+            mock_client.return_value.chat.completions.create.side_effect = [
+                definition_resp, examples_resp,
+            ]
+            result = generate_definition_and_examples(no_gemini, "primirje")
+
+        mock_def.assert_not_called()
+        mock_ex.assert_not_called()
+        assert "direct" in result.definition_html
+        assert "Direct" in result.examples_html
 
 
 class TestDecideImageSource:
@@ -105,8 +115,7 @@ class TestGenerateImagePrompt:
         with patch("bcs_anki.llm._get_client") as mock_client:
             mock_client.return_value.chat.completions.create.return_value = resp
             result = generate_image_prompt(mock_cfg, "primirje")
-        # _chat returns content as-is; generate_image_prompt returns it directly
-        assert "ceasefire" in result
+        assert result == "A peaceful ceasefire scene"
 
 
 class TestGenerateImageSearchTerm:

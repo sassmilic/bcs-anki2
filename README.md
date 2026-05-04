@@ -6,13 +6,9 @@ Generate Anki flashcards (cloze deletions + images) from BCS word lists.
 
 ```sh
 pip install -e .
-```
-
-Create a `.env` file:
-
-```
-OPENAI_API_KEY=sk-...
-STOCK_IMAGE_API_KEY=...
+cp run.sh.example run.sh
+chmod +x run.sh
+# Edit run.sh and fill in your API keys (OPENAI_API_KEY + one stock-image key)
 ```
 
 The Anki media folder defaults to `~/Library/Application Support/Anki2/User 1/collection.media`. To change it, create a config YAML with `anki_media_folder: /your/path` and pass `--config config.yaml`.
@@ -20,14 +16,13 @@ The Anki media folder defaults to `~/Library/Application Support/Anki2/User 1/co
 ## Workflow
 
 ```sh
-# 1. Generate flashcards + images from a word list
-bcs-anki generate words.txt
+./run.sh                # uses words.txt
+./run.sh other.txt      # custom word list
 
-# 2. Copy generated images to Anki media folder (uses config defaults)
-bcs-anki copy-media
-
-# 3. Import output/words.csv in Anki desktop (File > Import)
+# Then in Anki desktop: File > Import → output/<input>.csv
 ```
+
+`run.sh` runs `bcs-anki generate` and then `bcs-anki copy-media` for you.
 
 ## Other commands
 

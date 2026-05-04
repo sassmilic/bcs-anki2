@@ -80,15 +80,10 @@ class TestFetchStockImage:
 
 
 class TestGenerateAiImage:
-    @patch("bcs_anki.images.request_with_retries")
     @patch("bcs_anki.images.OpenAI")
-    def test_generates_and_downloads(self, mock_openai_cls, mock_req, mock_cfg, mock_openai_image, tmp_path):
+    def test_generates_and_downloads(self, mock_openai_cls, mock_cfg, mock_openai_image, tmp_path):
         dest = tmp_path / "ai_img.png"
-        mock_openai_cls.return_value.images.generate.return_value = mock_openai_image()
-
-        img_resp = MagicMock()
-        img_resp.content = b"AI_IMAGE_DATA"
-        mock_req.return_value = img_resp
+        mock_openai_cls.return_value.images.generate.return_value = mock_openai_image(b"AI_IMAGE_DATA")
 
         generate_ai_image(mock_cfg, "a peaceful scene", dest)
         assert dest.read_bytes() == b"AI_IMAGE_DATA"

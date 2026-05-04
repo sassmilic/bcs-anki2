@@ -1,39 +1,8 @@
 """Tier 1: Pure logic tests — no mocks, no I/O."""
 from __future__ import annotations
 
-from bcs_anki.cli import WordEntry, parse_word_line
 from bcs_anki.csv_writer import _escape_field
 from bcs_anki.images import build_image_filename
-from bcs_anki.llm import _with_context
-from bcs_anki.prompts import CONTEXT_ADDENDUM
-
-
-# --- parse_word_line ---
-
-class TestParseWordLine:
-    def test_word_only(self):
-        entry = parse_word_line("primirje")
-        assert entry == WordEntry("primirje", None)
-
-    def test_word_with_context(self):
-        entry = parse_word_line("zamak|dvorac, ne brava")
-        assert entry == WordEntry("zamak", "dvorac, ne brava")
-
-    def test_extra_spaces(self):
-        entry = parse_word_line("  zamak  |  dvorac  ")
-        assert entry == WordEntry("zamak", "dvorac")
-
-    def test_multiple_pipes_only_splits_first(self):
-        entry = parse_word_line("a|b|c")
-        assert entry == WordEntry("a", "b|c")
-
-    def test_empty_context_after_pipe(self):
-        entry = parse_word_line("word|")
-        assert entry == WordEntry("word", "")
-
-    def test_strips_word_only(self):
-        entry = parse_word_line("  hello  ")
-        assert entry == WordEntry("hello", None)
 
 
 # --- build_image_filename ---
@@ -82,16 +51,3 @@ class TestEscapeField:
 
     def test_empty_string(self):
         assert _escape_field("") == ""
-
-
-# --- _with_context ---
-
-class TestWithContext:
-    def test_none_context_unchanged(self):
-        prompt = "test prompt"
-        assert _with_context(prompt, None) == prompt
-
-    def test_context_appended(self):
-        prompt = "test prompt"
-        result = _with_context(prompt, "some context")
-        assert result == prompt + CONTEXT_ADDENDUM.format(context="some context")

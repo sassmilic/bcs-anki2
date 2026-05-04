@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import hashlib
 import logging
 from pathlib import Path
@@ -91,9 +92,8 @@ def generate_ai_image(cfg: AppConfig, prompt: str, dest: Path) -> None:
         model=cfg.image_generation_model,
         prompt=prompt,
         size=cfg.image_size,
+        quality=cfg.image_quality,
         n=1,
     )
-    img_url = response.data[0].url
-    img_resp = request_with_retries("GET", img_url, delay_seconds=cfg.rate_limit_delay_seconds)
-    dest.write_bytes(img_resp.content)
+    dest.write_bytes(base64.b64decode(response.data[0].b64_json))
 

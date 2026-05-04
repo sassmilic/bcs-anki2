@@ -10,6 +10,7 @@ build/
 
 # Environment / secrets
 .env
+run.sh
 
 # Project artifacts
 output.csv
