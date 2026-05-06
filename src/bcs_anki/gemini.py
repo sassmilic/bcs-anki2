@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
+import time
 
 from google import genai
+from google.genai import errors as genai_errors
 from google.genai import types as genai_types
 
 from .config import AppConfig
@@ -19,6 +21,12 @@ logger = logging.getLogger(__name__)
 
 _OK_SIGIL = "✓"
 
+# Transient 5xx (typically 503 UNAVAILABLE — "spikes in demand are usually temporary")
+# get retried with exponential backoff. 4xx errors (auth, quota, malformed input)
+# are permanent for this request and bubble up immediately.
+_MAX_ATTEMPTS = 3
+_INITIAL_BACKOFF_SECONDS = 2.0
+
 
 def _get_client(cfg: AppConfig) -> genai.Client:
     if not cfg.gemini_api_key:
@@ -27,16 +35,30 @@ def _get_client(cfg: AppConfig) -> genai.Client:
 
 
 def _gemini_chat(cfg: AppConfig, system_prompt: str, user_prompt: str) -> str:
-    client = _get_client(cfg)
-    response = client.models.generate_content(
-        model=cfg.gemini_model,
-        contents=user_prompt,
-        config=genai_types.GenerateContentConfig(system_instruction=system_prompt),
-    )
-    text = response.text
-    if text is None:
-        raise EmptyLlmResponseError("Gemini returned an empty response")
-    return text
+    delay = _INITIAL_BACKOFF_SECONDS
+    for attempt in range(1, _MAX_ATTEMPTS + 1):
+        try:
+            client = _get_client(cfg)
+            response = client.models.generate_content(
+                model=cfg.gemini_model,
+                contents=user_prompt,
+                config=genai_types.GenerateContentConfig(system_instruction=system_prompt),
+            )
+            text = response.text
+            if text is None:
+                raise EmptyLlmResponseError("Gemini returned an empty response")
+            return text
+        except genai_errors.ServerError as exc:
+            if attempt == _MAX_ATTEMPTS:
+                raise
+            logger.warning(
+                "Gemini transient error (attempt %d/%d), retrying in %.1fs: %s",
+                attempt, _MAX_ATTEMPTS, delay, exc,
+            )
+            time.sleep(delay)
+            delay *= 2
+    # Unreachable: the loop either returns or raises.
+    raise RuntimeError("Gemini retry loop exited without result")
 
 
 def _apply_review(label: str, word: str, original: str, gemini_response: str) -> str:
