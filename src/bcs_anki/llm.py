@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from openai import OpenAI
 
 from .config import AppConfig
+from .costs import COST_TRACKER
 from .gemini import review_definition, review_examples
 from .errors import EmptyLlmResponseError, MissingApiKeyError
 from .images import ImageSource
@@ -49,6 +50,10 @@ def _chat(cfg: AppConfig, system_prompt: str, user_prompt: str) -> str:
             {"role": "user", "content": user_prompt},
         ],
     )
+
+    usage = response.usage
+    if usage is not None:
+        COST_TRACKER.add_openai(usage.prompt_tokens or 0, usage.completion_tokens or 0)
 
     choices = response.choices or []
     if not choices:

@@ -52,7 +52,7 @@ tags: "bcs naski"
 max_workers: 4
 
 # LLM model for definitions/sentences
-llm_model: "gpt-4.1-mini"
+llm_model: "gpt-5.4-mini"
 
 # Gemini reviewer model
 gemini_model: "gemini-2.5-pro"
@@ -120,7 +120,7 @@ def load_config(path: Optional[Path]) -> AppConfig:
         log_file=Path(data.get("log_file", "./processing.log")).expanduser(),
         rate_limit_delay_seconds=float(data.get("rate_limit_delay_seconds", 2)),
         tags=str(data.get("tags", "bcs naski")),
-        llm_model=data.get("llm_model", "gpt-4.1-mini"),
+        llm_model=data.get("llm_model", "gpt-5.4-mini"),
         gemini_model=data.get("gemini_model", "gemini-2.5-pro"),
         max_workers=int(data.get("max_workers", 4)),
     )

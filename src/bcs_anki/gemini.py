@@ -8,6 +8,7 @@ from google.genai import errors as genai_errors
 from google.genai import types as genai_types
 
 from .config import AppConfig
+from .costs import COST_TRACKER
 from .errors import EmptyLlmResponseError, MissingApiKeyError
 from .prompts import (
     REVIEW_DEFINITION_SYSTEM,
@@ -44,6 +45,12 @@ def _gemini_chat(cfg: AppConfig, system_prompt: str, user_prompt: str) -> str:
                 contents=user_prompt,
                 config=genai_types.GenerateContentConfig(system_instruction=system_prompt),
             )
+            usage = getattr(response, "usage_metadata", None)
+            if usage is not None:
+                COST_TRACKER.add_gemini(
+                    getattr(usage, "prompt_token_count", 0) or 0,
+                    getattr(usage, "candidates_token_count", 0) or 0,
+                )
             text = response.text
             if text is None:
                 raise EmptyLlmResponseError("Gemini returned an empty response")
@@ -59,7 +66,6 @@ def _gemini_chat(cfg: AppConfig, system_prompt: str, user_prompt: str) -> str:
             delay *= 2
     # Unreachable: the loop either returns or raises.
     raise RuntimeError("Gemini retry loop exited without result")
-
 
 def _apply_review(label: str, word: str, original: str, gemini_response: str) -> str:
     """Return the original if Gemini signaled OK, else log + return Gemini's correction."""

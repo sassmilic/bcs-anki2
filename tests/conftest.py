@@ -25,7 +25,7 @@ def mock_cfg(tmp_path: Path) -> AppConfig:
         log_file=tmp_path / "test.log",
         rate_limit_delay_seconds=0.0,
         tags="test",
-        llm_model="gpt-4.1-mini",
+        llm_model="gpt-5.4-mini",
         gemini_model="gemini-2.5-pro",
         max_workers=2,
     )
