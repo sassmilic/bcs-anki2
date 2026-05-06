@@ -6,9 +6,15 @@ import logging
 from pathlib import Path
 from typing import Literal
 
-from openai import OpenAI
+from openai import BadRequestError, OpenAI
 
 from .config import AppConfig
+from .errors import (
+    ImageRejectedError,
+    MissingApiKeyError,
+    NoStockResultsError,
+    UnsupportedStockProviderError,
+)
 from .http import request_with_retries
 
 logger = logging.getLogger(__name__)
@@ -32,7 +38,7 @@ def build_image_filename(word: str) -> str:
 def fetch_stock_image(cfg: AppConfig, word_en: str, dest: Path, count: int = 3) -> list[Path]:
     """Fetch up to `count` stock images. Returns list of paths actually downloaded."""
     if not cfg.stock_image_api_key:
-        raise RuntimeError("Stock image API key is not configured")
+        raise MissingApiKeyError("Stock image API key is not configured")
 
     api = cfg.stock_image_api.lower()
 
@@ -44,7 +50,7 @@ def fetch_stock_image(cfg: AppConfig, word_en: str, dest: Path, count: int = 3) 
         data = resp.json()
         results = data.get("results", [])
         if not results:
-            raise RuntimeError("No Unsplash results")
+            raise NoStockResultsError("No Unsplash results")
         img_urls = [r["urls"]["regular"] for r in results[:count]]
     elif api == "pexels":
         url = "https://api.pexels.com/v1/search"
@@ -54,7 +60,7 @@ def fetch_stock_image(cfg: AppConfig, word_en: str, dest: Path, count: int = 3) 
         data = resp.json()
         photos = data.get("photos", [])
         if not photos:
-            raise RuntimeError("No Pexels results")
+            raise NoStockResultsError("No Pexels results")
         img_urls = [p["src"]["medium"] for p in photos[:count]]
     elif api == "pixabay":
         url = "https://pixabay.com/api/"
@@ -63,10 +69,12 @@ def fetch_stock_image(cfg: AppConfig, word_en: str, dest: Path, count: int = 3) 
         data = resp.json()
         hits = data.get("hits", [])
         if not hits:
-            raise RuntimeError("No Pixabay results")
+            raise NoStockResultsError("No Pixabay results")
         img_urls = [h["webformatURL"] for h in hits[:count]]
     else:
-        raise ValueError(f"Unsupported stock_image_api: {cfg.stock_image_api}")
+        raise UnsupportedStockProviderError(
+            f"Unsupported stock_image_api: {cfg.stock_image_api}"
+        )
 
     stem = dest.stem
     suffix = dest.suffix
@@ -85,15 +93,18 @@ def fetch_stock_image(cfg: AppConfig, word_en: str, dest: Path, count: int = 3) 
 
 def generate_ai_image(cfg: AppConfig, prompt: str, dest: Path) -> None:
     if not cfg.openai_api_key:
-        raise RuntimeError("OPENAI_API_KEY is not configured")
+        raise MissingApiKeyError("OPENAI_API_KEY is not configured")
 
     client = OpenAI(api_key=cfg.openai_api_key)
-    response = client.images.generate(
-        model=cfg.image_generation_model,
-        prompt=prompt,
-        size=cfg.image_size,
-        quality=cfg.image_quality,
-        n=1,
-    )
+    try:
+        response = client.images.generate(
+            model=cfg.image_generation_model,
+            prompt=prompt,
+            size=cfg.image_size,
+            quality=cfg.image_quality,
+            n=1,
+        )
+    except BadRequestError as exc:
+        raise ImageRejectedError(str(exc)) from exc
     dest.write_bytes(base64.b64decode(response.data[0].b64_json))
 

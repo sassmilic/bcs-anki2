@@ -5,34 +5,20 @@ import random
 import shutil
 import subprocess
 import sys
-import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Optional
 
 import click
-from openai import BadRequestError
 
 from .config import AppConfig, load_config
-from .csv_writer import CsvRow, append_rows, ensure_header
 from .costs import COST_TRACKER
+from .csv_writer import ensure_header
 from .health import check_apis
-from .images import (
-    ImageSource,
-    build_image_filename,
-    fetch_stock_image,
-    generate_ai_image,
-)
-from .llm import (
-    decide_image_source,
-    generate_definition_and_examples,
-    generate_image_prompt,
-    generate_image_search_term,
-    resolve_lemma,
-)
 from .logging_utils import setup_logging
-from .progress import ProgressState, load_progress, mark_completed, mark_failed, progress_path_for
+from .pipeline import RunContext, ensure_failed_header, process_word
+from .progress import ProgressState, load_progress, progress_path_for
 
 logger = logging.getLogger(__name__)
 
@@ -42,92 +28,6 @@ def _load_app_config(config_path: Optional[str], verbose: bool = False) -> AppCo
     cfg = load_config(path)
     setup_logging(cfg.log_file, verbose=verbose)
     return cfg
-
-
-_failed_lock = threading.Lock()
-
-# Tracks lemmas currently being processed by other workers, so two raw inputs
-# that resolve to the same lemma don't both do the work.
-_lemma_lock = threading.Lock()
-_lemmas_in_progress: set[str] = set()
-
-
-def _ensure_failed_header(path: Path) -> None:
-    if path.exists():
-        return
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("word\treason\n", encoding="utf-8")
-
-
-def _summarize_exception(exc: BaseException, max_len: int = 160) -> str:
-    """Return a short, single-line description of an exception for the failed.tsv.
-
-    Strips verbose API payloads (anything after the first `{`, where Google/OpenAI
-    error JSON typically begins) and collapses whitespace. Full traceback still
-    goes to the log via logger.exception.
-    """
-    msg = str(exc)
-    brace = msg.find("{")
-    if brace > 0:
-        msg = msg[:brace].rstrip(" .:,-")
-    msg = " ".join(msg.split())
-    summary = f"{type(exc).__name__}: {msg}" if msg else type(exc).__name__
-    if len(summary) > max_len:
-        summary = summary[: max_len - 1] + "…"
-    return summary
-
-
-def _append_failed(path: Path, word: str, reason: str) -> None:
-    safe_reason = reason.replace("\t", " ").replace("\n", " ").replace("\r", " ")
-    with _failed_lock:
-        with path.open("a", encoding="utf-8") as f:
-            f.write(f"{word}\t{safe_reason}\n")
-
-
-def _fetch_image(cfg: AppConfig, word: str) -> list[tuple[str, Path]] | None:
-    """Fetch or generate images for a word. Returns list of (filename, path) or None."""
-    img_source: ImageSource = decide_image_source(cfg, word)
-    img_filename = build_image_filename(word)
-    img_path = cfg.temp_image_folder / img_filename
-    cfg.temp_image_folder.mkdir(parents=True, exist_ok=True)
-
-    if img_source == "stock":
-        logger.info("Using stock image for '%s'", word)
-        try:
-            search_term_en = generate_image_search_term(cfg, word)
-            logger.info("Image search term (EN) for '%s': %s", word, search_term_en)
-            paths = fetch_stock_image(cfg, search_term_en, img_path)
-            return [(p.name, p) for p in paths]
-        except Exception as exc:  # noqa: BLE001
-            logger.warning(
-                "Stock image failed for '%s', falling back to AI image: %s",
-                word,
-                exc,
-            )
-            img_source = "ai"
-
-    if img_source == "ai":
-        logger.info("Using AI image for '%s'", word)
-        img_prompt = generate_image_prompt(cfg, word)
-        logger.info("Image prompt for '%s': %s", word, img_prompt)
-        try:
-            generate_ai_image(cfg, img_prompt, img_path)
-        except BadRequestError as exc:
-            logger.warning(
-                "AI image rejected by safety filter for '%s', regenerating prompt and retrying: %s",
-                word, exc,
-            )
-            img_prompt = generate_image_prompt(cfg, word)
-            logger.info("Retry image prompt for '%s': %s", word, img_prompt)
-            try:
-                generate_ai_image(cfg, img_prompt, img_path)
-            except BadRequestError:
-                logger.warning(
-                    "AI image retry also rejected for '%s', skipping image", word,
-                )
-                return None
-
-    return [(img_filename, img_path)]
 
 
 def _parse_review_csv(text: str) -> list[dict]:
@@ -321,7 +221,7 @@ def generate(
     failed_csv = cfg.output_folder / f"{input_file.stem}_failed.tsv"
     if not append and failed_csv.exists():
         failed_csv.unlink()
-    _ensure_failed_header(failed_csv)
+    ensure_failed_header(failed_csv)
 
     progress_file = progress_path_for(input_file, cfg.output_folder)
     words = [s for line in input_file.read_text(encoding="utf-8").splitlines() if (s := line.strip())]
@@ -366,9 +266,17 @@ def generate(
         effective_workers = min(cfg.max_workers, len(pending)) if pending else 1
         click.echo(f"Using {effective_workers} workers for {len(pending)} remaining words.")
 
+        ctx = RunContext(
+            cfg=cfg,
+            state=state,
+            out_csv=out_csv,
+            progress_file=progress_file,
+            failed_csv=failed_csv,
+        )
+
         with ThreadPoolExecutor(max_workers=effective_workers) as pool:
             future_to_word = {
-                pool.submit(_process_word, w, cfg, state, out_csv, progress_file, failed_csv): w
+                pool.submit(process_word, w, ctx): w
                 for w in pending
             }
 

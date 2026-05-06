@@ -5,7 +5,13 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from openai import BadRequestError
 
+from bcs_anki.errors import (
+    ImageRejectedError,
+    NoStockResultsError,
+    UnsupportedStockProviderError,
+)
 from bcs_anki.images import fetch_stock_image, generate_ai_image
 
 
@@ -75,8 +81,13 @@ class TestFetchStockImage:
         search_resp.json.return_value = {"results": []}
         mock_req.return_value = search_resp
 
-        with pytest.raises(RuntimeError, match="No Unsplash results"):
+        with pytest.raises(NoStockResultsError, match="No Unsplash results"):
             fetch_stock_image(mock_cfg, "xyz", tmp_path / "img.png")
+
+    def test_unknown_provider_raises_typed_error(self, mock_cfg, tmp_path):
+        mock_cfg.stock_image_api = "bogus"
+        with pytest.raises(UnsupportedStockProviderError):
+            fetch_stock_image(mock_cfg, "x", tmp_path / "img.png")
 
 
 class TestGenerateAiImage:
@@ -88,3 +99,14 @@ class TestGenerateAiImage:
         generate_ai_image(mock_cfg, "a peaceful scene", dest)
         assert dest.read_bytes() == b"AI_IMAGE_DATA"
         mock_openai_cls.return_value.images.generate.assert_called_once()
+
+    @patch("bcs_anki.images.OpenAI")
+    def test_safety_rejection_raises_image_rejected(self, mock_openai_cls, mock_cfg, tmp_path):
+        # OpenAI's BadRequestError requires a response/body shape; build a minimal one.
+        resp = MagicMock()
+        resp.request = MagicMock()
+        mock_openai_cls.return_value.images.generate.side_effect = BadRequestError(
+            message="content rejected", response=resp, body={"error": {"code": "safety"}}
+        )
+        with pytest.raises(ImageRejectedError):
+            generate_ai_image(mock_cfg, "anything", tmp_path / "img.png")

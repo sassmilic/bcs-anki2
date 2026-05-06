@@ -34,3 +34,23 @@ class HttpTransientError(CustomError):
             message = f"{message}: {excerpt}"
         super().__init__(message)
         self.status_code = status_code
+
+
+class ImageError(CustomError):
+    """Base class for image-pipeline failures."""
+
+
+class ImageRejectedError(ImageError):
+    """Raised when an AI image generator refuses a prompt (e.g. safety filter)."""
+
+
+class ImageProviderError(ImageError):
+    """Raised on provider-side failures during image fetch (HTTP, decoding, etc.)."""
+
+
+class NoStockResultsError(ImageError):
+    """Raised when a stock-image search returns zero usable results."""
+
+
+class UnsupportedStockProviderError(ConfigError):
+    """Raised when stock_image_api is set to a value with no implementation."""

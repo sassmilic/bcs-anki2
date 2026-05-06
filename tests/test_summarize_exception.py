@@ -5,7 +5,7 @@ column, making the file impossible to scan.
 """
 from __future__ import annotations
 
-from bcs_anki.cli import _summarize_exception
+from bcs_anki.pipeline import summarize_exception as _summarize_exception
 
 
 class _GeminiClientError(Exception):
