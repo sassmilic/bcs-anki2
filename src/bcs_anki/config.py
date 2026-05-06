@@ -8,6 +8,8 @@ from typing import Optional
 import yaml
 from dotenv import load_dotenv
 
+from .errors import ConfigError, UnsupportedConfigFormatError
+
 
 @dataclass
 class AppConfig:
@@ -92,7 +94,7 @@ def load_config(path: Optional[Path]) -> AppConfig:
         data = yaml.safe_load(DEFAULT_CONFIG_YAML)
     else:
         if not path.exists():
-            raise FileNotFoundError(f"Config file not found: {path}")
+            raise ConfigError(f"Config file not found: {path}")
         if path.suffix.lower() in {".yml", ".yaml"}:
             data = yaml.safe_load(path.read_text(encoding="utf-8"))
         elif path.suffix.lower() == ".json":
@@ -100,7 +102,7 @@ def load_config(path: Optional[Path]) -> AppConfig:
 
             data = json.loads(path.read_text(encoding="utf-8"))
         else:
-            raise ValueError("Config file must be YAML or JSON")
+            raise UnsupportedConfigFormatError("Config file must be YAML or JSON")
 
     keys = _load_api_keys()
 

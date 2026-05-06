@@ -4,6 +4,9 @@ from __future__ import annotations
 from dataclasses import replace
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from bcs_anki.errors import EmptyLlmResponseError
 from bcs_anki.llm import (
     GeneratedText,
     decide_image_source,
@@ -125,3 +128,27 @@ class TestGenerateImageSearchTerm:
             mock_client.return_value.chat.completions.create.return_value = resp
             result = generate_image_search_term(mock_cfg, "primirje")
         assert result == "ceasefire, truce"
+
+
+class TestChatDefensiveHandling:
+    def test_raises_when_choices_empty(self, mock_cfg):
+        resp = MagicMock()
+        resp.choices = []
+        with patch("bcs_anki.llm._get_client") as mock_client:
+            mock_client.return_value.chat.completions.create.return_value = resp
+            with patch("bcs_anki.llm.LEMMA_USER", "{word}"):
+                with patch("bcs_anki.llm.LEMMA_SYSTEM", "system"):
+                    with pytest.raises(EmptyLlmResponseError, match="no choices"):
+                        resolve_lemma(mock_cfg, "test")
+
+    def test_raises_when_content_none(self, mock_cfg):
+        resp = MagicMock()
+        choice = MagicMock()
+        choice.message.content = None
+        resp.choices = [choice]
+        with patch("bcs_anki.llm._get_client") as mock_client:
+            mock_client.return_value.chat.completions.create.return_value = resp
+            with patch("bcs_anki.llm.LEMMA_USER", "{word}"):
+                with patch("bcs_anki.llm.LEMMA_SYSTEM", "system"):
+                    with pytest.raises(EmptyLlmResponseError, match="empty content"):
+                        resolve_lemma(mock_cfg, "test")

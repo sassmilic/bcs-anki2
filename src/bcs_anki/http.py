@@ -7,6 +7,8 @@ import requests
 from requests import Response
 from requests.exceptions import ConnectionError, HTTPError, Timeout
 
+from .errors import HttpTransientError
+
 logger = logging.getLogger(__name__)
 
 
@@ -41,8 +43,8 @@ def request_with_retries(
                 timeout=60,
             )
             if resp.status_code == 429 or resp.status_code >= 500:
-                raise _status_error(resp)
-            resp.raise_for_status()
+                raise HttpTransientError(resp.status_code)
+
             return resp
         except (Timeout, ConnectionError, RuntimeError) as exc:
             logger.error("HTTP request failed (attempt %s): %s", attempt, exc)

@@ -6,6 +6,7 @@ from google import genai
 from google.genai import types as genai_types
 
 from .config import AppConfig
+from .errors import EmptyLlmResponseError, MissingApiKeyError
 from .prompts import (
     REVIEW_DEFINITION_SYSTEM,
     REVIEW_DEFINITION_USER,
@@ -21,7 +22,7 @@ _OK_SIGIL = "✓"
 
 def _get_client(cfg: AppConfig) -> genai.Client:
     if not cfg.gemini_api_key:
-        raise RuntimeError("GEMINI_API_KEY is not configured")
+        raise MissingApiKeyError("GEMINI_API_KEY is not configured")
     return genai.Client(api_key=cfg.gemini_api_key)
 
 
@@ -34,7 +35,7 @@ def _gemini_chat(cfg: AppConfig, system_prompt: str, user_prompt: str) -> str:
     )
     text = response.text
     if text is None:
-        raise RuntimeError("Gemini returned an empty response")
+        raise EmptyLlmResponseError("Gemini returned an empty response")
     return text
 
 

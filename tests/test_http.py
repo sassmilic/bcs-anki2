@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from requests.exceptions import HTTPError
 
+from bcs_anki.errors import HttpTransientError
 from bcs_anki.http import request_with_retries
 
 
@@ -42,7 +43,7 @@ class TestRequestWithRetries:
         fail_resp.status_code = 500
         mock_request.return_value = fail_resp
 
-        with pytest.raises(RuntimeError, match="HTTP 500"):
+        with pytest.raises(HttpTransientError, match="HTTP 500"):
             request_with_retries("GET", "https://example.com", max_retries=2, delay_seconds=0.01)
         assert mock_request.call_count == 2
 

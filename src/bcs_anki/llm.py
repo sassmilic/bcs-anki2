@@ -7,6 +7,7 @@ from openai import OpenAI
 
 from .config import AppConfig
 from .gemini import review_definition, review_examples
+from .errors import EmptyLlmResponseError, MissingApiKeyError
 from .images import ImageSource
 
 from .prompts import (
@@ -35,7 +36,7 @@ class GeneratedText:
 
 def _get_client(cfg: AppConfig) -> OpenAI:
     if not cfg.openai_api_key:
-        raise RuntimeError("OPENAI_API_KEY is not configured")
+        raise MissingApiKeyError("OPENAI_API_KEY is not configured")
     return OpenAI(api_key=cfg.openai_api_key)
 
 
@@ -48,7 +49,21 @@ def _chat(cfg: AppConfig, system_prompt: str, user_prompt: str) -> str:
             {"role": "user", "content": user_prompt},
         ],
     )
-    return response.choices[0].message.content
+
+    choices = response.choices or []
+    if not choices:
+        raise EmptyLlmResponseError(
+            f"OpenAI chat returned no choices (model={cfg.llm_model}, "
+            f"prompt={user_prompt[:60]!r})"
+        )
+
+    content = choices[0].message.content or ""
+    if not content.strip():
+        raise EmptyLlmResponseError(
+            f"OpenAI chat returned empty content (model={cfg.llm_model}, "
+            f"prompt={user_prompt[:60]!r})"
+        )
+    return content
 
 
 def resolve_lemma(cfg: AppConfig, word: str) -> str:
