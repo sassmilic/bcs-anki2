@@ -16,6 +16,7 @@ from openai import BadRequestError
 
 from .config import AppConfig, load_config
 from .csv_writer import CsvRow, append_rows, ensure_header
+from .costs import COST_TRACKER
 from .images import (
     ImageSource,
     build_image_filename,
@@ -404,7 +405,11 @@ def generate(
         remaining_total,
     )
 
+    cost_summary = COST_TRACKER.summary(cfg.llm_model, cfg.gemini_model)
+    logger.info("Token/cost summary for this run: %s", cost_summary)
+
     click.echo("Done.")
+    click.echo(f"Token/cost summary: {cost_summary}")
     if state.failed_words:
         click.echo(f"Failed words: {', '.join(state.failed_words)}")
         click.echo(f"See {failed_csv} for failure reasons.")

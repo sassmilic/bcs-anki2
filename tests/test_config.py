@@ -16,7 +16,7 @@ class TestDefaultConfig:
         cfg = load_config(None)
         assert isinstance(cfg, AppConfig)
         assert cfg.max_workers == 4
-        assert cfg.llm_model == "gpt-4.1-mini"
+        assert cfg.llm_model == "gpt-5.4-mini"
         assert cfg.gemini_model == "gemini-2.5-pro"
         assert cfg.image_generation_model == "gpt-image-2"
         assert cfg.image_quality == "medium"
