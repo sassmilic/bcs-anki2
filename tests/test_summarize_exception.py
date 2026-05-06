@@ -48,3 +48,11 @@ def test_truncates_long_message_with_ellipsis():
 def test_empty_message_falls_back_to_class_name():
     exc = RuntimeError()
     assert _summarize_exception(exc) == "RuntimeError"
+
+
+from bcs_anki.errors import MissingApiKeyError
+
+def test_typed_error_includes_class_name():
+    exc = MissingApiKeyError("OPENAI_API_KEY is not configured")
+    summary = _summarize_exception(exc)
+    assert summary == "MissingApiKeyError: OPENAI_API_KEY is not configured"

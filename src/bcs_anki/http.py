@@ -5,6 +5,8 @@ import time
 
 import requests
 
+from .errors import HttpTransientError
+
 logger = logging.getLogger(__name__)
 
 
@@ -31,7 +33,7 @@ def request_with_retries(
                 timeout=60,
             )
             if resp.status_code >= 500:
-                raise RuntimeError(f"HTTP {resp.status_code}")
+                raise HttpTransientError(resp.status_code)
             return resp
         except Exception as exc:  # noqa: BLE001
             logger.error("HTTP request failed (attempt %s): %s", attempt, exc)

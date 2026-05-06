@@ -7,6 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from bcs_anki.config import AppConfig, load_config
+from bcs_anki.errors import ConfigError
 
 
 class TestDefaultConfig:
@@ -41,7 +42,7 @@ class TestCustomConfig:
         assert cfg.tags == "custom"
 
     def test_missing_file_raises(self, tmp_path: Path):
-        with pytest.raises(FileNotFoundError):
+        with pytest.raises(ConfigError):
             load_config(tmp_path / "nonexistent.yaml")
 
 

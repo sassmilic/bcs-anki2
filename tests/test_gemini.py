@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from bcs_anki.errors import MissingApiKeyError
 from bcs_anki.gemini import review_definition, review_examples
 
 
@@ -54,5 +55,5 @@ class TestReviewExamples:
 class TestMissingApiKey:
     def test_review_raises_without_key(self, mock_cfg):
         no_key_cfg = replace(mock_cfg, gemini_api_key=None)
-        with pytest.raises(RuntimeError, match="GEMINI_API_KEY"):
+        with pytest.raises(MissingApiKeyError, match="GEMINI_API_KEY"):
             review_definition(no_key_cfg, "test", "anything")
