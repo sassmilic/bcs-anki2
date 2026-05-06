@@ -28,6 +28,9 @@ class EmptyLlmResponseError(LlmError):
 class HttpTransientError(CustomError):
     """Raised for transient HTTP responses that should be retried."""
 
-    def __init__(self, status_code: int) -> None:
-        super().__init__(f"HTTP {status_code}")
+    def __init__(self, status_code: int, excerpt: str = "") -> None:
+        message = f"HTTP {status_code}"
+        if excerpt:
+            message = f"{message}: {excerpt}"
+        super().__init__(message)
         self.status_code = status_code
