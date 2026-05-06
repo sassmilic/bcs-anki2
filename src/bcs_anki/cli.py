@@ -16,6 +16,7 @@ from openai import BadRequestError
 
 from .config import AppConfig, load_config
 from .csv_writer import CsvRow, append_rows, ensure_header
+from .health import check_apis
 from .images import (
     ImageSource,
     build_image_filename,
@@ -306,6 +307,9 @@ def generate(
         "max_workers": cfg.max_workers,
     }
     logger.info("Loaded configuration: %s", safe_cfg)
+
+    if not dry_run:
+        check_apis(cfg)
 
     out_csv = output_csv or (cfg.output_folder / (input_file.stem + ".csv"))
     if not append and out_csv.exists():
