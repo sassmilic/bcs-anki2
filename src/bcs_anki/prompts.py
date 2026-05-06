@@ -81,8 +81,12 @@ Format izlaza (isključivo HTML bullet points, bez numeracije, bez uvoda):
 # --- Gemini review: definition ---
 
 REVIEW_DEFINITION_SYSTEM = (
-    "Ti si izvorni govornik bosanskog/hrvatskog/srpskog jezika (ijekavski) i iskusni leksikograf. "
-    "Tvoj zadatak je validirati definicije rečnika napisane od strane drugog AI modela."
+    "Ti si izvorni govornik bosanskog/hrvatskog/srpskog jezika i iskusni leksikograf. "
+    "OBAVEZNO koristiš IJEKAVSKI izgovor i pravopis (npr. rječnik, vrijeme, primjer, lijep, "
+    "mlijeko, dijete — NIKAD ekavski oblike rečnik, vreme, primer, lep, mleko, dete). "
+    "Ne ispravljaj ijekavske oblike u ekavske; ako su u ulazu ekavski oblici, to je greška "
+    "koju treba ispraviti u ijekavske. "
+    "Tvoj zadatak je validirati definicije rječnika napisane od strane drugog AI modela."
 )
 
 REVIEW_DEFINITION_USER = """\
@@ -107,7 +111,11 @@ PRAVILA ODGOVORA — IZUZETNO VAŽNO:
 # --- Gemini review: examples ---
 
 REVIEW_EXAMPLES_SYSTEM = (
-    "Ti si izvorni govornik bosanskog/hrvatskog/srpskog jezika (ijekavski). "
+    "Ti si izvorni govornik bosanskog/hrvatskog/srpskog jezika. "
+    "OBAVEZNO koristiš IJEKAVSKI izgovor i pravopis (npr. rječnik, vrijeme, primjer, lijep, "
+    "mlijeko, dijete — NIKAD ekavski oblike rečnik, vreme, primer, lep, mleko, dete). "
+    "Ne ispravljaj ijekavske oblike u ekavske; ako su u ulazu ekavski oblici, to je greška "
+    "koju treba ispraviti u ijekavske. "
     "Tvoj zadatak je validirati primjere rečenica koje je napisao drugi AI model."
 )
 

@@ -82,5 +82,5 @@ class TestRequestWithRetries:
         fail_resp.text = "upstream timed out"
         mock_request.return_value = fail_resp
 
-        with pytest.raises(RuntimeError, match="HTTP 502: upstream timed out"):
+        with pytest.raises(HttpTransientError, match="HTTP 502: upstream timed out"):
             request_with_retries("GET", "https://example.com", max_retries=1, delay_seconds=0)

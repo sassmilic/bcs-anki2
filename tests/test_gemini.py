@@ -5,9 +5,26 @@ from dataclasses import replace
 from unittest.mock import MagicMock, patch
 
 import pytest
+from google.genai import errors as genai_errors
 
 from bcs_anki.errors import MissingApiKeyError
 from bcs_anki.gemini import review_definition, review_examples
+
+
+def _server_error(code: int = 503, status: str = "UNAVAILABLE", message: str = "high demand"):
+    return genai_errors.ServerError(
+        code,
+        {"error": {"code": code, "message": message, "status": status}},
+        None,
+    )
+
+
+def _client_error(code: int = 400, status: str = "INVALID_ARGUMENT", message: str = "bad input"):
+    return genai_errors.ClientError(
+        code,
+        {"error": {"code": code, "message": message, "status": status}},
+        None,
+    )
 
 
 def _mock_response(text: str) -> MagicMock:
@@ -57,3 +74,37 @@ class TestMissingApiKey:
         no_key_cfg = replace(mock_cfg, gemini_api_key=None)
         with pytest.raises(MissingApiKeyError, match="GEMINI_API_KEY"):
             review_definition(no_key_cfg, "test", "anything")
+
+
+class TestRetryOnServerError:
+    def test_retries_then_succeeds(self, mock_cfg):
+        """One transient 503, second call succeeds — retry yields the right result."""
+        original = "{{c1::primirje}} — def"
+        with patch("bcs_anki.gemini.time.sleep") as mock_sleep, \
+             patch("bcs_anki.gemini._get_client") as mock_client:
+            mock_client.return_value.models.generate_content.side_effect = [
+                _server_error(503),
+                _mock_response("✓"),
+            ]
+            assert review_definition(mock_cfg, "primirje", original) == original
+            assert mock_sleep.called  # backoff actually slept
+
+    def test_raises_after_max_attempts(self, mock_cfg):
+        """All attempts return 503 — final exception bubbles up."""
+        with patch("bcs_anki.gemini.time.sleep"), \
+             patch("bcs_anki.gemini._get_client") as mock_client:
+            mock_client.return_value.models.generate_content.side_effect = _server_error(503)
+            with pytest.raises(genai_errors.ServerError):
+                review_definition(mock_cfg, "primirje", "x")
+            # 3 attempts × 1 call each = 3 invocations of generate_content.
+            assert mock_client.return_value.models.generate_content.call_count == 3
+
+    def test_does_not_retry_client_error(self, mock_cfg):
+        """4xx (auth, quota, bad input) is permanent — no retry."""
+        with patch("bcs_anki.gemini.time.sleep") as mock_sleep, \
+             patch("bcs_anki.gemini._get_client") as mock_client:
+            mock_client.return_value.models.generate_content.side_effect = _client_error(400)
+            with pytest.raises(genai_errors.ClientError):
+                review_definition(mock_cfg, "primirje", "x")
+            assert mock_client.return_value.models.generate_content.call_count == 1
+            assert not mock_sleep.called
