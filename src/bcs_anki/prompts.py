@@ -98,7 +98,8 @@ Predložena definicija (od drugog AI modela):
 Provjeri:
 1. Da li je definicija činjenično tačna i nedvosmisleno opisuje upravo riječ "{word}" (a ne neku sličnu riječ)?
 2. Da li je gramatička kategorija (vrsta riječi, rod, "ja"-oblik za glagole) ispravna?
-3. Da li je zadržana izvorna struktura: {{{{c1::lema}}}} (gramatika) — definicija; drugo značenje (ako postoji)?
+3. Da li je CJELOKUPNI BCS tekst strogo i dosljedno u ijekavici (bez ijednog ekavskog oblika)?
+4. Da li je zadržana izvorna struktura: {{{{c1::lema}}}} (gramatika) — definicija; drugo značenje (ako postoji)?
 
 PRAVILA ODGOVORA — IZUZETNO VAŽNO:
 - Ako je definicija u potpunosti ispravna, odgovori SAMO znakom: ✓
@@ -129,7 +130,8 @@ Provjeri svaku rečenicu po sljedećim kriterijumima:
 1. Gramatička ispravnost (padeži, vremena, vidovi, povratni glagoli "se").
 2. Semantička prirodnost — da li bi izvorni govornik to zaista rekao?
 3. Tolerancija za kreativnost: dozvoljene su neobične, ekspresivne rečenice koliko bi ih napisao kreativan pisac. Odbaci samo ono što izvorni govornik NE BI rekao.
-4. Da li su sva pojavljivanja ciljne riječi i dalje omotana u {{{{c1::...}}}}?
+4. Da li je CJELOKUPNI BCS tekst strogo i dosljedno u ijekavici (bez ijednog ekavskog oblika)?
+5. Da li su sva pojavljivanja ciljne riječi i dalje omotana u {{{{c1::...}}}}?
 
 PRAVILA ODGOVORA — IZUZETNO VAŽNO:
 - Ako su SVE rečenice ispravne, odgovori SAMO znakom: ✓

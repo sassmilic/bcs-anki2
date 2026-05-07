@@ -14,7 +14,9 @@ import pytest
 from bcs_anki.prompts import (
     DEFINITION_USER,
     EXAMPLES_USER,
+    REVIEW_DEFINITION_SYSTEM,
     REVIEW_DEFINITION_USER,
+    REVIEW_EXAMPLES_SYSTEM,
     REVIEW_EXAMPLES_USER,
 )
 
@@ -39,3 +41,10 @@ def test_no_broken_single_brace_cloze(name, template, kwargs):
     # Match `{c1` not preceded by `{` — that's a stray single-brace cloze.
     broken = re.findall(r"(?<!\{)\{c1[:]+[^}]*\}(?!\})", rendered)
     assert not broken, f"{name}: broken cloze markers in rendered output: {broken}"
+
+
+def test_review_prompts_enforce_ijekavica_requirement():
+    assert "OBAVEZNO koristiš IJEKAVSKI" in REVIEW_DEFINITION_SYSTEM
+    assert "OBAVEZNO koristiš IJEKAVSKI" in REVIEW_EXAMPLES_SYSTEM
+    assert "CJELOKUPNI BCS tekst strogo i dosljedno u ijekavici" in REVIEW_DEFINITION_USER
+    assert "CJELOKUPNI BCS tekst strogo i dosljedno u ijekavici" in REVIEW_EXAMPLES_USER
