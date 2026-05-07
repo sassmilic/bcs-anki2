@@ -27,7 +27,7 @@ def _check_openai(cfg: AppConfig) -> None:
     client.chat.completions.create(
         model=cfg.llm_model,
         messages=[{"role": "user", "content": "ping"}],
-        max_tokens=1,
+        max_completion_tokens=64,
     )
     # Image model availability via models.list (free).
     ids = {m.id for m in client.models.list().data}

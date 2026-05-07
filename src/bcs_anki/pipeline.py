@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import logging
 import threading
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Optional
+
+import click
 
 from .config import AppConfig
-from .csv_writer import CsvRow, append_rows
+from .csv_writer import CsvRow, append_rows, ensure_header
 from .errors import ImageRejectedError
 from .images import (
     ImageSource,
@@ -22,7 +25,13 @@ from .llm import (
     generate_image_search_term,
     resolve_lemma,
 )
-from .progress import ProgressState, mark_completed, mark_failed
+from .progress import (
+    ProgressState,
+    load_progress,
+    mark_completed,
+    mark_failed,
+    progress_path_for,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -194,3 +203,142 @@ def process_word(raw_word: str, ctx: RunContext) -> bool:
         if claimed:
             with ctx.lemma_lock:
                 ctx.lemmas_in_progress.discard(word)
+
+
+def _edit_ocr_text(cfg: AppConfig, image_path: Path, raw_text: str) -> str:
+    """Write OCR text to disk, open $EDITOR for human review, return the saved text.
+
+    Falls back gracefully if the editor cannot be opened (e.g. non-interactive
+    environments): logs a warning and returns the unedited text.
+    """
+    cfg.output_folder.mkdir(parents=True, exist_ok=True)
+    ocr_path = cfg.output_folder / f"{image_path.stem}.ocr.txt"
+    ocr_path.write_text(raw_text, encoding="utf-8")
+    click.echo(
+        f"\nOCR text for {image_path.name} written to {ocr_path}.\n"
+        f"Edit it now — close your editor when done. (Set --no-edit-ocr to skip.)\n"
+    )
+    try:
+        click.edit(filename=str(ocr_path))
+    except click.UsageError as exc:
+        logger.warning("Could not open editor (%s); proceeding with unedited OCR text.", exc)
+        return raw_text
+    edited = ocr_path.read_text(encoding="utf-8")
+    click.echo(f"Resuming with {len(edited)} chars of OCR text from {ocr_path.name}.")
+    return edited
+
+
+def run_dictionary_pipeline(
+    cfg: AppConfig,
+    image_paths: list[Path],
+    *,
+    output_csv: Optional[Path] = None,
+    resume: bool = False,
+    fresh: bool = False,
+    append: bool = False,
+    edit_ocr: bool = True,
+) -> tuple[int, int]:
+    """Process one or more dictionary page images into Basic+reversed flashcards.
+
+    Each image gets its own CSV and progress file (named after the image stem)
+    unless `output_csv` is provided, in which case all images write into that one.
+
+    When `edit_ocr` is True (default), pauses after Tesseract on each image to
+    let the user review/correct the raw OCR text before parsing — the dominant
+    quality lever per real-world testing.
+
+    Returns (total_completed, total_failed) across all images.
+    """
+    from .dictionary import (
+        DictionaryRunContext,
+        canonicalize_ijekavian,
+        ocr_page,
+        parse_page,
+        process_dictionary_entry,
+        _slugify_tag,
+    )
+
+    total_completed = 0
+    total_failed = 0
+
+    for image_path in image_paths:
+        logger.info("=== Dictionary image: %s ===", image_path)
+        raw_text = ocr_page(image_path)
+        if edit_ocr:
+            raw_text = _edit_ocr_text(cfg, image_path, raw_text)
+        page = parse_page(cfg, raw_text)
+        if not page.entries:
+            logger.warning("No entries parsed from %s; skipping.", image_path)
+            continue
+
+        section_slug = _slugify_tag(page.section) if page.section else _slugify_tag(image_path.stem)
+        logger.info(
+            "Page %s: section=%r (slug=%r), %d entries",
+            image_path.name, page.section, section_slug, len(page.entries),
+        )
+
+        out_csv = output_csv or (cfg.output_folder / f"{image_path.stem}.csv")
+        if not append and out_csv.exists() and output_csv is None:
+            out_csv.unlink()
+            logger.info("Removed existing output file: %s", out_csv)
+        ensure_header(out_csv)
+
+        failed_csv = cfg.output_folder / f"{image_path.stem}_failed.tsv"
+        if not append and failed_csv.exists():
+            failed_csv.unlink()
+        ensure_failed_header(failed_csv)
+
+        progress_file = progress_path_for(image_path, cfg.output_folder)
+        if fresh or not resume or not progress_file.exists():
+            state = ProgressState(
+                input_file=str(image_path),
+                total_words=len(page.entries),
+                completed_words=[],
+                failed_words=[],
+                last_updated="",
+            )
+        else:
+            existing = load_progress(progress_file)
+            if existing and existing.input_file == str(image_path):
+                state = existing
+            else:
+                state = ProgressState(
+                    input_file=str(image_path),
+                    total_words=len(page.entries),
+                    completed_words=[],
+                    failed_words=[],
+                    last_updated="",
+                )
+
+        ijekavian = canonicalize_ijekavian(cfg, [e.serbian_raw for e in page.entries])
+        logger.info("Canonicalized %d entries to ijekavian", len(ijekavian))
+
+        ctx = DictionaryRunContext(
+            cfg=cfg,
+            state=state,
+            out_csv=out_csv,
+            progress_file=progress_file,
+            failed_csv=failed_csv,
+            section_slug=section_slug,
+            failed_lock=threading.Lock(),
+        )
+
+        effective_workers = max(1, min(cfg.max_workers, len(page.entries)))
+        with ThreadPoolExecutor(max_workers=effective_workers) as pool:
+            futures = [
+                pool.submit(process_dictionary_entry, entry, ijekavian[i], ctx)
+                for i, entry in enumerate(page.entries)
+            ]
+            for fut in as_completed(futures):
+                fut.result()
+
+        completed = len(state.completed_words)
+        failed = len(state.failed_words)
+        total_completed += completed
+        total_failed += failed
+        logger.info(
+            "Page %s done: %d completed, %d failed (out of %d entries)",
+            image_path.name, completed, failed, len(page.entries),
+        )
+
+    return total_completed, total_failed

@@ -15,6 +15,8 @@ dependencies = [
     "python-dotenv>=1.0",
     "openai>=1.0",
     "google-genai>=1.0",
+    "pytesseract>=0.3.10",
+    "Pillow>=10",
 ]
 
 [project.optional-dependencies]
