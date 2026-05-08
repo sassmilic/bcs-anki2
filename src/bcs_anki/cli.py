@@ -18,7 +18,7 @@ from .csv_writer import ensure_header
 from .dict_ocr import extract_dict_pages, subject_slug, write_dict_csv
 from .health import check_apis
 from .logging_utils import setup_logging
-from .pipeline import RunContext, ensure_failed_header, process_word, run_dictionary_pipeline
+from .pipeline import RunContext, ensure_failed_header, process_word
 from .progress import ProgressState, load_progress, progress_path_for
 
 logger = logging.getLogger(__name__)
@@ -161,7 +161,7 @@ def main() -> None:
 
 
 @main.command()
-@click.argument("input_file", type=click.Path(exists=True, dir_okay=False, path_type=Path), required=False)
+@click.argument("input_file", type=click.Path(exists=True, dir_okay=False, path_type=Path))
 @click.option("--output", "-o", "output_csv", type=click.Path(dir_okay=False, path_type=Path))
 @click.option("--config", "-c", "config_path", type=click.Path(exists=False, dir_okay=False, path_type=Path))
 @click.option("--anki-media", type=click.Path(file_okay=False, path_type=Path))
@@ -171,21 +171,8 @@ def main() -> None:
 @click.option("--dry-run", is_flag=True, help="Show what would be processed without making API calls.")
 @click.option("--workers", "-w", type=int, default=None, help="Max parallel workers (overrides config).")
 @click.option("--append", is_flag=True, help="Append to existing CSV instead of overwriting.")
-@click.option(
-    "--dictionary-image",
-    "dictionary_images",
-    type=click.Path(exists=True, dir_okay=False, path_type=Path),
-    multiple=True,
-    help="Path to a dictionary page image. Repeat for multiple pages. "
-         "Skips definition/examples generation; produces image↔ijekavian flashcards only.",
-)
-@click.option(
-    "--edit-ocr/--no-edit-ocr",
-    default=True,
-    help="With --dictionary-image: pause after OCR to let you edit the raw text before parsing. Default on.",
-)
 def generate(
-    input_file: Optional[Path],
+    input_file: Path,
     output_csv: Optional[Path],
     config_path: Optional[Path],
     anki_media: Optional[Path],
@@ -195,13 +182,8 @@ def generate(
     dry_run: bool,
     workers: Optional[int],
     append: bool,
-    dictionary_images: tuple[Path, ...],
-    edit_ocr: bool,
 ) -> None:
-    """Generate Anki-ready CSV and images from a word list or dictionary page image(s)."""
-    if not input_file and not dictionary_images:
-        raise click.UsageError("Provide either INPUT_FILE or --dictionary-image PATH (or both).")
-
+    """Generate Anki-ready CSV and images from a word list."""
     cfg = _load_app_config(str(config_path) if config_path else None, verbose=verbose)
     if anki_media:
         cfg.anki_media_folder = anki_media.expanduser()
@@ -230,28 +212,6 @@ def generate(
 
     if not dry_run:
         check_apis(cfg)
-
-    if dictionary_images:
-        click.echo(f"Processing {len(dictionary_images)} dictionary image(s)...")
-        if dry_run:
-            for img in dictionary_images:
-                click.echo(f"[DRY-RUN] Would process dictionary image: {img}")
-        else:
-            completed, failed = run_dictionary_pipeline(
-                cfg,
-                list(dictionary_images),
-                output_csv=output_csv,
-                resume=resume,
-                fresh=fresh,
-                append=append,
-                edit_ocr=edit_ocr,
-            )
-            click.echo(f"Dictionary pipeline done: {completed} completed, {failed} failed.")
-            cost_summary = COST_TRACKER.summary(cfg.llm_model, cfg.gemini_model)
-            logger.info("Token/cost summary for this run: %s", cost_summary)
-            click.echo(f"Token/cost summary: {cost_summary}")
-        if input_file is None:
-            return
 
     out_csv = output_csv or (cfg.output_folder / (input_file.stem + ".csv"))
     if not append and out_csv.exists():
