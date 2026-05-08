@@ -110,3 +110,66 @@ class TestGenerateAiImage:
         )
         with pytest.raises(ImageRejectedError):
             generate_ai_image(mock_cfg, "anything", tmp_path / "img.png")
+
+    @patch("bcs_anki.images.OpenAI")
+    def test_records_legacy_per_image_cost_when_no_usage_field(
+        self, mock_openai_cls, mock_cfg, mock_openai_image, tmp_path,
+    ):
+        """Legacy models (dall-e-3) return no `usage` → tracked as per-image counts."""
+        from bcs_anki.costs import COST_TRACKER
+
+        COST_TRACKER.images.clear()
+        COST_TRACKER.image_tokens.clear()
+        COST_TRACKER.image_token_counts.clear()
+
+        mock_cfg.image_generation_model = "dall-e-3"
+        mock_cfg.image_size = "1024x1024"
+        mock_cfg.image_quality = "standard"
+        mock_openai_cls.return_value.images.generate.return_value = mock_openai_image(b"X")
+        generate_ai_image(mock_cfg, "p", tmp_path / "a.png")
+        generate_ai_image(mock_cfg, "p", tmp_path / "b.png")
+
+        assert COST_TRACKER.images[("dall-e-3", "1024x1024", "standard")] == 2
+        assert COST_TRACKER.image_tokens == {}
+
+    @patch("bcs_anki.images.OpenAI")
+    def test_records_token_cost_when_usage_present(
+        self, mock_openai_cls, mock_cfg, mock_openai_image_with_usage, tmp_path,
+    ):
+        """Token-priced models (gpt-image-2) return `usage` → tracked as token totals."""
+        from bcs_anki.costs import COST_TRACKER
+
+        COST_TRACKER.images.clear()
+        COST_TRACKER.image_tokens.clear()
+        COST_TRACKER.image_token_counts.clear()
+
+        mock_cfg.image_generation_model = "gpt-image-2"
+        mock_openai_cls.return_value.images.generate.return_value = mock_openai_image_with_usage(
+            input_tokens=100, output_tokens=4096,
+        )
+        generate_ai_image(mock_cfg, "p", tmp_path / "a.png")
+        generate_ai_image(mock_cfg, "p", tmp_path / "b.png")
+
+        assert COST_TRACKER.image_token_counts["gpt-image-2"] == 2
+        usage = COST_TRACKER.image_tokens["gpt-image-2"]
+        assert usage.text_input_tokens == 200
+        assert usage.image_output_tokens == 8192
+        # No legacy per-image rows for this model.
+        assert COST_TRACKER.images == {}
+
+    @patch("bcs_anki.images.OpenAI")
+    def test_does_not_record_cost_on_rejection(self, mock_openai_cls, mock_cfg, tmp_path):
+        from bcs_anki.costs import COST_TRACKER
+
+        COST_TRACKER.images.clear()
+        COST_TRACKER.image_tokens.clear()
+        COST_TRACKER.image_token_counts.clear()
+
+        resp = MagicMock(); resp.request = MagicMock()
+        mock_openai_cls.return_value.images.generate.side_effect = BadRequestError(
+            message="rejected", response=resp, body={"error": {"code": "safety"}}
+        )
+        with pytest.raises(ImageRejectedError):
+            generate_ai_image(mock_cfg, "x", tmp_path / "img.png")
+        assert COST_TRACKER.images == {}
+        assert COST_TRACKER.image_tokens == {}

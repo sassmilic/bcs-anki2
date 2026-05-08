@@ -47,7 +47,7 @@ def mock_openai_chat():
 
 @pytest.fixture()
 def mock_openai_image():
-    """Returns a mock OpenAI images.generate response (gpt-image-2 base64 shape)."""
+    """Returns a mock OpenAI images.generate response (legacy dall-e-3 shape, no usage)."""
     import base64
 
     def _make(image_bytes: bytes = b"AI_IMAGE_DATA") -> MagicMock:
@@ -55,6 +55,40 @@ def mock_openai_image():
         datum.b64_json = base64.b64encode(image_bytes).decode("ascii")
         resp = MagicMock()
         resp.data = [datum]
+        resp.usage = None  # legacy models don't return token usage
+        return resp
+    return _make
+
+
+@pytest.fixture()
+def mock_openai_image_with_usage():
+    """OpenAI images.generate response with token usage (gpt-image-* shape)."""
+    import base64
+
+    def _make(
+        image_bytes: bytes = b"AI_IMAGE_DATA",
+        input_tokens: int = 50,
+        output_tokens: int = 4096,
+        text_tokens: int | None = None,
+        image_tokens: int = 0,
+        cached_tokens: int = 0,
+    ) -> MagicMock:
+        datum = MagicMock()
+        datum.b64_json = base64.b64encode(image_bytes).decode("ascii")
+
+        usage = MagicMock()
+        usage.input_tokens = input_tokens
+        usage.output_tokens = output_tokens
+        details = {
+            "text_tokens": text_tokens if text_tokens is not None else input_tokens,
+            "image_tokens": image_tokens,
+            "cached_tokens": cached_tokens,
+        }
+        usage.input_tokens_details = details
+
+        resp = MagicMock()
+        resp.data = [datum]
+        resp.usage = usage
         return resp
     return _make
 

@@ -9,6 +9,7 @@ from typing import Literal
 from openai import BadRequestError, OpenAI
 
 from .config import AppConfig
+from .costs import COST_TRACKER
 from .errors import (
     ImageRejectedError,
     MissingApiKeyError,
@@ -107,4 +108,45 @@ def generate_ai_image(cfg: AppConfig, prompt: str, dest: Path) -> None:
     except BadRequestError as exc:
         raise ImageRejectedError(str(exc)) from exc
     dest.write_bytes(base64.b64decode(response.data[0].b64_json))
+    _record_image_cost(cfg, response)
+
+
+def _record_image_cost(cfg: AppConfig, response) -> None:
+    """Route to per-image or per-token tracking based on what the API returned.
+
+    Token-priced models (gpt-image-*) include a `usage` object on the response;
+    legacy fixed-price models (dall-e-3) don't.
+    """
+    usage = getattr(response, "usage", None)
+    if usage is None:
+        COST_TRACKER.add_image(cfg.image_generation_model, cfg.image_size, cfg.image_quality)
+        return
+
+    # The OpenAI SDK exposes input_tokens / output_tokens on the usage object,
+    # and may break input_tokens down via input_tokens_details. We pull whatever
+    # is available; missing fields default to 0.
+    details = getattr(usage, "input_tokens_details", None) or {}
+    if hasattr(details, "model_dump"):
+        details = details.model_dump()
+    elif not isinstance(details, dict):
+        details = {}
+
+    input_tokens = getattr(usage, "input_tokens", 0) or 0
+    output_tokens = getattr(usage, "output_tokens", 0) or 0
+    text_in = details.get("text_tokens", 0) or 0
+    image_in = details.get("image_tokens", 0) or 0
+    cached_in = details.get("cached_tokens", 0) or details.get("cached_input_tokens", 0) or 0
+
+    # If the breakdown wasn't provided, treat all input as text — most likely
+    # for prompt-only generations (no input images).
+    if text_in == 0 and image_in == 0 and cached_in == 0:
+        text_in = input_tokens
+
+    COST_TRACKER.add_image_tokens(
+        cfg.image_generation_model,
+        text_input_tokens=text_in,
+        image_input_tokens=image_in,
+        cached_image_input_tokens=cached_in,
+        image_output_tokens=output_tokens,
+    )
 
