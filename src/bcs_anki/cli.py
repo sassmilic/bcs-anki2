@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 import logging
-import random
 import shutil
-import subprocess
-import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -30,52 +27,6 @@ def _load_app_config(config_path: Optional[str], verbose: bool = False) -> AppCo
     cfg = load_config(path)
     setup_logging(cfg.log_file, verbose=verbose)
     return cfg
-
-
-def _parse_review_csv(text: str) -> list[dict]:
-    """Group an Anki-style CSV into one entry per word.
-
-    Each word produces 0-2 Cloze rows followed by 0-1 Basic row. The Basic row
-    carries the lemma in column 2; Cloze rows immediately preceding it belong
-    to the same word. Cloze rows with no following Basic (image was skipped)
-    are emitted as orphans with word="(no image)".
-    """
-    lines = text.splitlines()
-    data_lines = [l for l in lines if l.strip() and not l.startswith("#")]
-
-    def _emit(words_list: list, clozes: list, basic_word: str, image_file: str) -> None:
-        words_list.append({
-            "word": basic_word,
-            "definition": clozes[0] if len(clozes) > 0 else "",
-            "examples": clozes[1] if len(clozes) > 1 else "",
-            "image_file": image_file,
-        })
-
-    words: list[dict] = []
-    pending_clozes: list[str] = []
-    for line in data_lines:
-        parts = line.split("\t")
-        if not parts:
-            continue
-        note_type = parts[0]
-        if note_type == "Cloze":
-            if len(pending_clozes) >= 2:
-                _emit(words, pending_clozes, "(no image)", "")
-                pending_clozes = []
-            pending_clozes.append(parts[1] if len(parts) > 1 else "")
-        elif note_type == "Basic (and reversed card)":
-            word = parts[2] if len(parts) > 2 else "?"
-            img_field = parts[1] if len(parts) > 1 else ""
-            img_file = ""
-            if 'src="' in img_field:
-                img_file = img_field.split('src="')[1].split('"')[0]
-            _emit(words, pending_clozes, word, img_file)
-            pending_clozes = []
-
-    if pending_clozes:
-        _emit(words, pending_clozes, "(no image)", "")
-
-    return words
 
 
 def _process_word(
@@ -464,125 +415,6 @@ def refine_dict(
         click.echo(f"Refining {src} → {dst}")
         n = refine_csv(cfg, src, dst)
         click.echo(f"  wrote {n} refined row(s)")
-
-
-@main.command()
-@click.argument("input_file", type=click.Path(exists=True, dir_okay=False, path_type=Path))
-@click.option("--config", "-c", "config_path", type=click.Path(exists=False, dir_okay=False, path_type=Path))
-def status(input_file: Path, config_path: Optional[Path]) -> None:
-    """Show progress for a given input file."""
-    cfg = _load_app_config(str(config_path) if config_path else None)
-    progress_file = progress_path_for(input_file, cfg.output_folder)
-    state = load_progress(progress_file)
-    if not state:
-        click.echo("No progress found.")
-        return
-
-    completed = len(state.completed_words)
-    failed = len(state.failed_words)
-    click.echo(f"Input file: {state.input_file}")
-    click.echo(f"Total words: {state.total_words}")
-    click.echo(f"Completed: {completed}")
-    click.echo(f"Failed: {failed}")
-    click.echo(f"Last updated: {state.last_updated}")
-
-
-@main.command()
-@click.argument("csv_file", type=click.Path(exists=True, dir_okay=False, path_type=Path))
-def validate(csv_file: Path) -> None:
-    """Validate that CSV file roughly matches Anki import format."""
-    text = csv_file.read_text(encoding="utf-8")
-    lines = text.splitlines()
-    if len(lines) < 4:
-        raise click.ClickException("CSV file too short or missing header.")
-
-    header = "\n".join(lines[:4])
-    if "#separator:Tab" not in header or "#notetype column:1" not in header:
-        raise click.ClickException("CSV header does not match required Anki format.")
-
-    # Check some rows
-    for i, line in enumerate(lines[4:], start=5):
-        if not line.strip():
-            continue
-        parts = line.split("\t")
-        if len(parts) != 4:
-            raise click.ClickException(f"Line {i} does not have 4 tab-separated columns.")
-        note_type = parts[0]
-        if note_type not in {"Cloze", "Basic (and reversed card)"}:
-            raise click.ClickException(f"Line {i} has unexpected note type: {note_type}")
-
-    click.echo("CSV appears valid for Anki import.")
-
-
-@main.command()
-@click.argument("csv_file", type=click.Path(exists=True, dir_okay=False, path_type=Path))
-@click.option("--image-dir", type=click.Path(exists=True, file_okay=False, path_type=Path), default=None, help="Directory containing generated images.")
-@click.option("--sample", "-n", type=int, default=None, help="Randomly sample N words to review.")
-@click.option("--reject-file", "-r", type=click.Path(dir_okay=False, path_type=Path), default=None, help="File to write rejected words to.")
-def review(csv_file: Path, image_dir: Optional[Path], sample: Optional[int], reject_file: Optional[Path]) -> None:
-    """Review generated flashcards for subjective quality."""
-    text = csv_file.read_text(encoding="utf-8")
-    words = _parse_review_csv(text)
-
-    if not words:
-        click.echo("No words found in CSV.")
-        return
-
-    if sample is not None and sample < len(words):
-        words = random.sample(words, sample)
-
-    total = len(words)
-    rejected: list[str] = []
-    accepted = 0
-    reviewed = 0
-
-    for idx, entry in enumerate(words, 1):
-        click.echo(f"\n{'─' * 3} Word {idx}/{total}: {entry['word']} {'─' * 40}")
-        click.echo(f"Definition: {entry['definition'][:120]}...")
-        click.echo(f"Examples:   {entry['examples'][:120]}...")
-
-        img_display = entry["image_file"]
-        if image_dir and entry["image_file"]:
-            img_display = str(image_dir / entry["image_file"])
-        click.echo(f"Image:      {img_display}")
-
-        choice = ""
-        while choice not in ("a", "r", "q"):
-            click.echo("\n[a]ccept  [r]eject  [o]pen image  [q]uit")
-            choice = click.getchar().lower()
-            if choice == "o":
-                if image_dir and entry["image_file"]:
-                    img_path = image_dir / entry["image_file"]
-                    if img_path.exists():
-                        if sys.platform == "darwin":
-                            subprocess.run(["open", str(img_path)], check=False)
-                        elif sys.platform == "linux":
-                            subprocess.run(["xdg-open", str(img_path)], check=False)
-                        else:
-                            subprocess.run(["start", str(img_path)], check=False, shell=True)
-                    else:
-                        click.echo(f"  Image not found: {img_path}")
-                else:
-                    click.echo("  No image directory specified (use --image-dir).")
-
-        if choice == "a":
-            accepted += 1
-            reviewed += 1
-        elif choice == "r":
-            rejected.append(entry["word"])
-            reviewed += 1
-        else:  # quit
-            click.echo("\nQuitting review.")
-            break
-
-    # Write rejected words
-    out_reject = reject_file or Path("rejected.txt")
-    if rejected:
-        out_reject.write_text("\n".join(rejected) + "\n", encoding="utf-8")
-
-    click.echo(f"\nReviewed {reviewed} words: {accepted} accepted, {len(rejected)} rejected.")
-    if rejected:
-        click.echo(f"Rejected words saved to {out_reject}")
 
 
 if __name__ == "__main__":

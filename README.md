@@ -28,9 +28,6 @@ The Anki media folder defaults to `~/Library/Application Support/Anki2/User 1/co
 
 ```sh
 bcs-anki generate words.txt --resume          # resume interrupted run
-bcs-anki review output/words.csv --sample 10  # spot-check generated cards
-bcs-anki status words.txt                     # check progress
-bcs-anki validate output/words.csv            # validate CSV format
 ```
 
 ## Testing
