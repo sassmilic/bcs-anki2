@@ -35,7 +35,9 @@ _MIME_BY_SUFFIX = {
 
 @dataclass
 class DictEntry:
-    number: int
+    # `number` is a string because some entries are category headers spanning a
+    # range (e.g. "1-5") while individual rows are bare integers ("1", "2", ...).
+    number: str
     english: str
     serbian: str
 
@@ -76,16 +78,25 @@ def _parse_response(text: str) -> DictPage:
 
     entries: list[DictEntry] = []
     for item in raw_entries:
-        try:
-            entries.append(
-                DictEntry(
-                    number=int(item["n"]),
-                    english=str(item["eng"]).strip(),
-                    serbian=str(item["sr"]).strip(),
-                )
+        if not isinstance(item, dict):
+            logger.warning("Skipping non-dict entry from Gemini: %r", item)
+            continue
+        n = item.get("n")
+        eng = item.get("eng")
+        sr = item.get("sr")
+        # An entry is valid as long as both English and Serbian sides are
+        # present. `n` can be a single number ("3") or a range ("1-5") for
+        # category headers that span multiple subentries.
+        if n in (None, "") or not eng or not sr:
+            logger.warning("Skipping entry with missing n/eng/sr from Gemini: %r", item)
+            continue
+        entries.append(
+            DictEntry(
+                number=str(n).strip(),
+                english=str(eng).strip(),
+                serbian=str(sr).strip(),
             )
-        except (KeyError, TypeError, ValueError) as exc:
-            raise ValueError(f"Malformed entry from Gemini: {item!r}") from exc
+        )
 
     return DictPage(subject=str(payload["subject"]).strip(), entries=entries)
 

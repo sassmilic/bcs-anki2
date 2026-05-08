@@ -42,9 +42,9 @@ _SAMPLE_JSON = json.dumps(
     {
         "subject": "Astronomija",
         "entries": [
-            {"n": 1, "eng": "star", "sr": "zvijezda"},
-            {"n": 2, "eng": "planet", "sr": "planeta"},
-            {"n": 3, "eng": "moon", "sr": "mjesec"},
+            {"n": "1", "eng": "star", "sr": "zvijezda"},
+            {"n": "2", "eng": "planet", "sr": "planeta"},
+            {"n": "3", "eng": "moon", "sr": "mjesec"},
         ],
     }
 )
@@ -59,8 +59,8 @@ class TestExtractDictPages:
 
         assert page.subject == "Astronomija"
         assert len(page.entries) == 3
-        assert page.entries[0] == DictEntry(number=1, english="star", serbian="zvijezda")
-        assert page.entries[2] == DictEntry(number=3, english="moon", serbian="mjesec")
+        assert page.entries[0] == DictEntry(number="1", english="star", serbian="zvijezda")
+        assert page.entries[2] == DictEntry(number="3", english="moon", serbian="mjesec")
 
     def test_multiple_images_passed_as_separate_parts(self, mock_cfg, tmp_path):
         img1 = _make_image(tmp_path, "p1.jpg")
@@ -115,6 +115,46 @@ class TestExtractDictPages:
             )
             with pytest.raises(ValueError, match="missing required keys"):
                 extract_dict_pages(mock_cfg, [img])
+
+    def test_includes_range_category_entries(self, mock_cfg, tmp_path):
+        """Range-spanning category headers (n='1-5') with paired eng+sr come through."""
+        img = _make_image(tmp_path)
+        payload = json.dumps({
+            "subject": "Geografija I",
+            "entries": [
+                {"n": "1-5", "eng": "layered structure of the earth", "sr": "slojevita gradja zemlje"},
+                {"n": "1", "eng": "earth's crust", "sr": "zemljina kora"},
+                {"n": "2", "eng": "hydrosphere", "sr": "hidrosfera"},
+                {"n": "6-12", "eng": "hypsographic curve", "sr": "hipsografska krivulja"},
+                {"n": "6", "eng": "peak", "sr": "vrh"},
+            ],
+        })
+        with patch("bcs_anki.gemini._get_client") as mock_client:
+            mock_client.return_value.models.generate_content.return_value = _mock_response(payload)
+            page = extract_dict_pages(mock_cfg, [img])
+
+        assert [e.number for e in page.entries] == ["1-5", "1", "2", "6-12", "6"]
+        assert page.entries[0].english == "layered structure of the earth"
+        assert page.entries[3].serbian == "hipsografska krivulja"
+
+    def test_skips_unpaired_entries(self, mock_cfg, tmp_path):
+        """Entries missing eng or sr (whether single or range) are dropped, not raised."""
+        img = _make_image(tmp_path)
+        payload = json.dumps({
+            "subject": "Astronomija",
+            "entries": [
+                {"n": "1", "eng": "star", "sr": "zvijezda"},
+                {"n": "22-28", "eng": "rotary motions", "sr": None},   # no sr pair
+                {"n": "2", "eng": "planet", "sr": "planeta"},
+                {"n": "3", "eng": "moon", "sr": ""},                    # empty sr
+                {"n": None, "eng": "x", "sr": "y"},                     # missing n
+            ],
+        })
+        with patch("bcs_anki.gemini._get_client") as mock_client:
+            mock_client.return_value.models.generate_content.return_value = _mock_response(payload)
+            page = extract_dict_pages(mock_cfg, [img])
+
+        assert [e.number for e in page.entries] == ["1", "2"]
 
     def test_empty_image_list_raises(self, mock_cfg):
         with pytest.raises(ValueError, match="at least one image"):

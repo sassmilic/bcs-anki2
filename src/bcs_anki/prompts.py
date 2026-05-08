@@ -219,16 +219,17 @@ Extract image(s) to JSON only:
 
 {
   "subject": "<first-page heading>",
-  "entries": [{"n": 1, "eng": "<Eng>", "sr": "<Serbian/SC as printed>"}]
+  "entries": [{"n": "<number or range>", "eng": "<Eng>", "sr": "<Serbian/SC as printed>"}]
 }
 
 Rules:
 - Pair same-number Eng/Sr terms.
 - Sr numbering resets to 1; that marks Sr list start.
 - Multi-image request = consecutive pages, same subject; pair within each page/list block even if numbering restarts.
+- `n` is a string. For ordinary entries it is the number ("1", "2", ...). For category headers that span a range of sub-entries (e.g. "1-5. layered structure of the earth" labelling rows 1 through 5), use the range itself as `n` (e.g. "1-5"). Emit BOTH the category header AND each numbered sub-entry as separate entries, in reading order.
 - Preserve printed forms exactly: commas, parentheses, alternates.
 - Join wrapped lines with single spaces.
-- Skip pair unless both sides are legible; do not guess.
+- Skip an entry (header or row) only if you cannot find a paired Serbian counterpart for it; do not guess.
 - No markdown/commentary.
 """
 
