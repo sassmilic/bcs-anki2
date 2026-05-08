@@ -363,7 +363,7 @@ def copy_media(src: Optional[Path], dst: Optional[Path], config_path: Optional[P
     "--output", "-o", "output_csv",
     type=click.Path(dir_okay=False, path_type=Path),
     default=None,
-    help="Output CSV path. Defaults to <output_folder>/<subject-slug>.csv.",
+    help="Output CSV path. Defaults to <output_folder>/dict/<subject-slug>.csv.",
 )
 @click.option("--config", "-c", "config_path", type=click.Path(exists=False, dir_okay=False, path_type=Path))
 @click.option("--verbose", "-v", is_flag=True)
@@ -387,15 +387,15 @@ def ocr_dict(
     if not image_paths:
         raise click.ClickException("No images selected.")
 
-    logger.info("Selected %d image(s):", len(image_paths))
+    click.echo(f"Selected {len(image_paths)} image(s):")
     for p in image_paths:
-        logger.info("  - %s", p.resolve())
+        click.echo(f"  - {p.resolve()}")
 
     click.echo(f"OCR'ing {len(image_paths)} dictionary page image(s) with Gemini...")
     page = extract_dict_pages(cfg, list(image_paths))
 
     if output_csv is None:
-        output_csv = cfg.output_folder / f"{subject_slug(page.subject)}.csv"
+        output_csv = cfg.output_folder / "dict" / f"{subject_slug(page.subject)}.csv"
 
     write_dict_csv(page, output_csv)
     click.echo(
