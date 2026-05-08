@@ -234,3 +234,29 @@ Rules:
 """
 
 
+# --- Dictionary CSV refinement (Gemini, batch JSON in/out) ---
+
+DICT_REFINE_SYSTEM = (
+    "You are a Serbo-Croatian linguist and translator reviewing a vocabulary "
+    "list extracted from a Serbian-English thematic dictionary. For each row "
+    "you receive: (1) ensure the Serbian/SC term is in IJEKAVIAN form (e.g. "
+    "'rijeka' not 'reka', 'mlijeko' not 'mleko', 'vrijeme' not 'vreme'); "
+    "(2) verify the English gloss is a good translation of the Serbian/SC "
+    "term in the given subject context — replace it with a better one when "
+    "it isn't. Return clean JSON only."
+)
+
+DICT_REFINE_USER = """\
+Subject context: "{subject}".
+
+Below is a JSON array of vocabulary rows from this subject. For each row:
+- If `sr` is ekavian, return the ijekavian form. If already ijekavian, return unchanged.
+- If `eng` is not the best translation of `sr` in this subject context, return a better one. If accurate, return unchanged.
+
+Return STRICT JSON: an array of {{"eng": "...", "sr": "..."}} objects, SAME LENGTH and SAME ORDER as the input. No markdown, no commentary.
+
+Input:
+{rows_json}
+"""
+
+

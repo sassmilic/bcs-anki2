@@ -16,6 +16,7 @@ from .config import AppConfig, load_config
 from .costs import COST_TRACKER
 from .csv_writer import ensure_header
 from .dict_ocr import extract_dict_pages, subject_slug, write_dict_csv
+from .dict_refine import refine_csv
 from .health import check_apis
 from .logging_utils import setup_logging
 from .pipeline import RunContext, ensure_failed_header, process_word
@@ -425,6 +426,44 @@ def _pick_image_files() -> tuple[Path, ...]:
     finally:
         root.destroy()
     return tuple(Path(p) for p in selected)
+
+
+@main.command("refine-dict")
+@click.argument(
+    "csv_paths",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    nargs=-1,
+    required=True,
+)
+@click.option(
+    "--output", "-o", "output_csv",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Output path (single CSV). With multiple inputs, must be omitted.",
+)
+@click.option("--config", "-c", "config_path", type=click.Path(exists=False, dir_okay=False, path_type=Path))
+@click.option("--verbose", "-v", is_flag=True)
+def refine_dict(
+    csv_paths: tuple[Path, ...],
+    output_csv: Optional[Path],
+    config_path: Optional[Path],
+    verbose: bool,
+) -> None:
+    """Refine ocr-dict CSVs: ekavian→ijekavian and improve English glosses.
+
+    Default output: <output_folder>/dict/refined/<input-name>.csv (one file per input).
+    Originals are left untouched. Multi-file: bcs-anki refine-dict output/dict/*.csv.
+    """
+    if output_csv is not None and len(csv_paths) > 1:
+        raise click.UsageError("--output is only valid with a single input CSV.")
+
+    cfg = _load_app_config(str(config_path) if config_path else None, verbose=verbose)
+
+    for src in csv_paths:
+        dst = output_csv or (cfg.output_folder / "dict" / "refined" / src.name)
+        click.echo(f"Refining {src} → {dst}")
+        n = refine_csv(cfg, src, dst)
+        click.echo(f"  wrote {n} refined row(s)")
 
 
 @main.command()

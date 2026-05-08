@@ -138,12 +138,46 @@ def subject_slug(subject: str) -> str:
     return slug or "untitled"
 
 
-def write_dict_csv(page: DictPage, output_path: Path) -> None:
-    """Write the page to a CSV: `# Subject: ...` line, then `english,serbian` rows."""
+def _write_csv_rows(subject: str, rows: list[tuple[str, str]], output_path: Path) -> None:
+    """Low-level writer: `# Subject: ...` line, then header, then (english, serbian) rows."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8", newline="") as fh:
-        fh.write(f"# Subject: {page.subject}\n")
+        fh.write(f"# Subject: {subject}\n")
         writer = csv.writer(fh)
         writer.writerow(["english", "serbian"])
-        for entry in page.entries:
-            writer.writerow([entry.english, entry.serbian])
+        for eng, sr in rows:
+            writer.writerow([eng, sr])
+
+
+def write_dict_csv(page: DictPage, output_path: Path) -> None:
+    """Write the page to a CSV: `# Subject: ...` line, then `english,serbian` rows."""
+    rows = [(e.english, e.serbian) for e in page.entries]
+    _write_csv_rows(page.subject, rows, output_path)
+
+
+def read_dict_csv(path: Path) -> tuple[str, list[tuple[str, str]]]:
+    """Inverse of write_dict_csv: parse `# Subject: ...` + (english, serbian) rows.
+
+    Returns (subject, rows). Raises ValueError on malformed input.
+    """
+    with path.open("r", encoding="utf-8", newline="") as fh:
+        first = fh.readline()
+        if not first.startswith("# Subject:"):
+            raise ValueError(f"{path}: missing `# Subject:` header on first line")
+        subject = first[len("# Subject:"):].strip()
+
+        reader = csv.reader(fh)
+        try:
+            header = next(reader)
+        except StopIteration as exc:
+            raise ValueError(f"{path}: missing CSV header row") from exc
+        if header != ["english", "serbian"]:
+            raise ValueError(f"{path}: unexpected CSV header {header!r}; expected ['english', 'serbian']")
+
+        rows: list[tuple[str, str]] = []
+        for row in reader:
+            if len(row) != 2:
+                raise ValueError(f"{path}: row has {len(row)} columns, expected 2: {row!r}")
+            rows.append((row[0], row[1]))
+
+    return subject, rows
