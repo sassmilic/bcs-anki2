@@ -260,3 +260,14 @@ Input:
 """
 
 
+# --- AI image fallback for generate-dict ---
+
+AI_FALLBACK_PROMPT = (
+    "Visualize: {english}. Category: {subject}. "
+    "For a vocab flashcard. No text, labels, numbers, captions, or watermark. "
+    "If it is a simple object, make a realistic clean image. "
+    "If it is a part/component/mechanism/spatial relation, use a simple "
+    "diagram or cutaway-style illustration without text."
+)
+
+

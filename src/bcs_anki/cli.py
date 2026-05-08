@@ -12,6 +12,7 @@ import click
 from .config import AppConfig, load_config
 from .costs import COST_TRACKER
 from .csv_writer import ensure_header
+from .dict_cards import run_generate_dict
 from .dict_ocr import extract_dict_pages, subject_slug, write_dict_csv
 from .dict_refine import refine_csv
 from .health import check_apis
@@ -415,6 +416,70 @@ def refine_dict(
         click.echo(f"Refining {src} → {dst}")
         n = refine_csv(cfg, src, dst)
         click.echo(f"  wrote {n} refined row(s)")
+
+
+@main.command("generate-dict")
+@click.argument(
+    "csv_paths",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    nargs=-1,
+    required=True,
+)
+@click.option(
+    "--output", "-o", "output_csv",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Output CSV path (single-input only). Defaults to <output_folder>/cards/<subject-slug>.csv.",
+)
+@click.option("--resume", "-r", is_flag=True, help="Resume from checkpoint if available.")
+@click.option("--fresh", is_flag=True, help="Ignore checkpoint and start fresh.")
+@click.option("--append", is_flag=True, help="Append to existing CSV instead of overwriting.")
+@click.option("--workers", "-w", type=int, default=None, help="Max parallel workers (overrides config).")
+@click.option("--config", "-c", "config_path", type=click.Path(exists=False, dir_okay=False, path_type=Path))
+@click.option("--verbose", "-v", is_flag=True)
+@click.option("--dry-run", is_flag=True, help="Skip API health check.")
+def generate_dict_cmd(
+    csv_paths: tuple[Path, ...],
+    output_csv: Optional[Path],
+    resume: bool,
+    fresh: bool,
+    append: bool,
+    workers: Optional[int],
+    config_path: Optional[Path],
+    verbose: bool,
+    dry_run: bool,
+) -> None:
+    """Generate Anki Basic+reversed flashcards (image ↔ Serbian) from refined dict CSV(s).
+
+    Tries a stock photo for each English term first, falling back to AI image
+    generation. Default output: <output_folder>/cards/<subject-slug>.csv per
+    input. Multi-file: bcs-anki generate-dict output/dict/refined/*.csv.
+    """
+    if output_csv is not None and len(csv_paths) > 1:
+        raise click.UsageError("--output is only valid with a single input CSV.")
+
+    cfg = _load_app_config(str(config_path) if config_path else None, verbose=verbose)
+    if workers is not None:
+        cfg.max_workers = workers
+
+    if not dry_run:
+        check_apis(cfg)
+
+    total_completed = 0
+    total_failed = 0
+    for src in csv_paths:
+        click.echo(f"Generating cards from {src}")
+        completed, failed = run_generate_dict(
+            cfg, src, output_csv,
+            resume=resume, fresh=fresh, append=append,
+        )
+        click.echo(f"  {completed} completed, {failed} failed")
+        total_completed += completed
+        total_failed += failed
+
+    cost_summary = COST_TRACKER.summary(cfg.llm_model, cfg.gemini_model)
+    logger.info("Token/cost summary for this run: %s", cost_summary)
+    click.echo(f"Total: {total_completed} completed, {total_failed} failed across {len(csv_paths)} file(s)")
 
 
 if __name__ == "__main__":
