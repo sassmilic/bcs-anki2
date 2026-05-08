@@ -79,6 +79,15 @@ class TestExtractDictPages:
         assert contents[0].inline_data.mime_type == "image/jpeg"
         assert contents[1].inline_data.mime_type == "image/png"
 
+    def test_heic_image_uses_heic_mime(self, mock_cfg, tmp_path):
+        img = _make_image(tmp_path, "iphone.heic")
+        with patch("bcs_anki.gemini._get_client") as mock_client:
+            mock_client.return_value.models.generate_content.return_value = _mock_response(_SAMPLE_JSON)
+            extract_dict_pages(mock_cfg, [img])
+
+        contents = mock_client.return_value.models.generate_content.call_args.kwargs["contents"]
+        assert contents[0].inline_data.mime_type == "image/heic"
+
     def test_retries_on_transient_server_error(self, mock_cfg, tmp_path):
         img = _make_image(tmp_path)
         with patch("bcs_anki.gemini.time.sleep"), \

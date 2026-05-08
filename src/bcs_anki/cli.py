@@ -414,7 +414,7 @@ def _pick_image_files() -> tuple[Path, ...]:
         selected = filedialog.askopenfilenames(
             title="Select dictionary page image(s)",
             filetypes=[
-                ("Images", "*.jpg *.jpeg *.png *.webp"),
+                ("Images", "*.jpg *.jpeg *.png *.webp *.heic *.heif"),
                 ("All files", "*"),
             ],
         )
