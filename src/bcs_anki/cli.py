@@ -15,6 +15,7 @@ import click
 from .config import AppConfig, load_config
 from .costs import COST_TRACKER
 from .csv_writer import ensure_header
+from .dict_ocr import extract_dict_pages, subject_slug, write_dict_csv
 from .health import check_apis
 from .logging_utils import setup_logging
 from .pipeline import RunContext, ensure_failed_header, process_word, run_dictionary_pipeline
@@ -390,6 +391,76 @@ def copy_media(src: Optional[Path], dst: Optional[Path], config_path: Optional[P
             count += 1
 
     click.echo(f"Copied {count} media files from {src} to {dst}.")
+
+
+@main.command("ocr-dict")
+@click.argument(
+    "image_paths",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    nargs=-1,
+)
+@click.option(
+    "--output", "-o", "output_csv",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Output CSV path. Defaults to <output_folder>/<subject-slug>.csv.",
+)
+@click.option("--config", "-c", "config_path", type=click.Path(exists=False, dir_okay=False, path_type=Path))
+@click.option("--verbose", "-v", is_flag=True)
+def ocr_dict(
+    image_paths: tuple[Path, ...],
+    output_csv: Optional[Path],
+    config_path: Optional[Path],
+    verbose: bool,
+) -> None:
+    """Extract a Serbian-English vocabulary section from dictionary page image(s).
+
+    Run with no IMAGE_PATHS to open a file picker. Sends the page(s) to Gemini
+    in one multimodal request and writes a CSV with the subject as a
+    `# Subject: ...` comment header and one (english,serbian) row per numbered
+    entry. All images must belong to the SAME subject.
+    """
+    cfg = _load_app_config(str(config_path) if config_path else None, verbose=verbose)
+
+    if not image_paths:
+        image_paths = _pick_image_files()
+    if not image_paths:
+        raise click.ClickException("No images selected.")
+
+    click.echo(f"OCR'ing {len(image_paths)} dictionary page image(s) with Gemini...")
+    page = extract_dict_pages(cfg, list(image_paths))
+
+    if output_csv is None:
+        output_csv = cfg.output_folder / f"{subject_slug(page.subject)}.csv"
+
+    write_dict_csv(page, output_csv)
+    click.echo(
+        f"Wrote {len(page.entries)} entries (subject: {page.subject!r}) to {output_csv}"
+    )
+
+
+def _pick_image_files() -> tuple[Path, ...]:
+    """Open a native file dialog for selecting dictionary page images.
+
+    Uses stdlib tkinter so no extra dependency is needed. Returns an empty
+    tuple if the user cancels.
+    """
+    import tkinter as tk
+    from tkinter import filedialog
+
+    root = tk.Tk()
+    root.withdraw()
+    try:
+        selected = filedialog.askopenfilenames(
+            title="Select dictionary page image(s)",
+            filetypes=[
+                ("Images", "*.jpg *.jpeg *.png *.webp"),
+                ("All files", "*"),
+            ],
+        )
+    finally:
+        root.destroy()
+    return tuple(Path(p) for p in selected)
 
 
 @main.command()

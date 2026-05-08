@@ -35,15 +35,20 @@ def _get_client(cfg: AppConfig) -> genai.Client:
     return genai.Client(api_key=cfg.gemini_api_key)
 
 
-def _gemini_chat(cfg: AppConfig, system_prompt: str, user_prompt: str) -> str:
+def _generate_with_retry(
+    cfg: AppConfig,
+    *,
+    contents,
+    config: genai_types.GenerateContentConfig,
+):
     delay = _INITIAL_BACKOFF_SECONDS
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:
             client = _get_client(cfg)
             response = client.models.generate_content(
                 model=cfg.gemini_model,
-                contents=user_prompt,
-                config=genai_types.GenerateContentConfig(system_instruction=system_prompt),
+                contents=contents,
+                config=config,
             )
             usage = getattr(response, "usage_metadata", None)
             if usage is not None:
@@ -51,10 +56,7 @@ def _gemini_chat(cfg: AppConfig, system_prompt: str, user_prompt: str) -> str:
                     getattr(usage, "prompt_token_count", 0) or 0,
                     getattr(usage, "candidates_token_count", 0) or 0,
                 )
-            text = response.text
-            if text is None:
-                raise EmptyLlmResponseError("Gemini returned an empty response")
-            return text
+            return response
         except genai_errors.ServerError as exc:
             if attempt == _MAX_ATTEMPTS:
                 raise
@@ -66,6 +68,18 @@ def _gemini_chat(cfg: AppConfig, system_prompt: str, user_prompt: str) -> str:
             delay *= 2
     # Unreachable: the loop either returns or raises.
     raise RuntimeError("Gemini retry loop exited without result")
+
+
+def _gemini_chat(cfg: AppConfig, system_prompt: str, user_prompt: str) -> str:
+    response = _generate_with_retry(
+        cfg,
+        contents=user_prompt,
+        config=genai_types.GenerateContentConfig(system_instruction=system_prompt),
+    )
+    text = response.text
+    if text is None:
+        raise EmptyLlmResponseError("Gemini returned an empty response")
+    return text
 
 def _apply_review(label: str, word: str, original: str, gemini_response: str) -> str:
     """Return the original if Gemini signaled OK, else log + return Gemini's correction."""

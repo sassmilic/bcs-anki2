@@ -277,3 +277,30 @@ Vrati ISKLJUČIVO JSON. Bez objašnjenja, bez markdowna, bez prefiksa."""
 SIMPLE_DRAW_PROMPT = "draw {word}"
 
 
+# --- Dictionary OCR (Gemini, image input) ---
+
+DICT_OCR_SYSTEM = (
+    "OCR Serbian/Eng thematic dictionary pages. Same subject per request. "
+    "Each page: heading, numbered Eng list, numbered Serbian/SC list. "
+    "Return strict JSON pairing entries by matching number."
+)
+
+DICT_OCR_USER = """\
+Extract image(s) to JSON only:
+
+{
+  "subject": "<first-page heading>",
+  "entries": [{"n": 1, "eng": "<Eng>", "sr": "<Serbian/SC as printed>"}]
+}
+
+Rules:
+- Pair same-number Eng/Sr terms.
+- Sr numbering resets to 1; that marks Sr list start.
+- Multi-image request = consecutive pages, same subject; pair within each page/list block even if numbering restarts.
+- Preserve printed forms exactly: commas, parentheses, alternates.
+- Join wrapped lines with single spaces.
+- Skip pair unless both sides are legible; do not guess.
+- No markdown/commentary.
+"""
+
+
