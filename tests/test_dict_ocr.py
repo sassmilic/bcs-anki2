@@ -8,10 +8,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 from google.genai import errors as genai_errors
 
-from bcs_anki.dict_ocr import (
+from bcs_anki.dict_ocr import extract_dict_pages
+from bcs_anki.dictionary_csv import (
     DictEntry,
     DictPage,
-    extract_dict_pages,
     subject_slug,
     write_dict_csv,
 )

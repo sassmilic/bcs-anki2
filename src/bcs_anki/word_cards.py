@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import logging
-import threading
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
 from pathlib import Path
 
 from .config import AppConfig
-from .csv_writer import CsvRow, append_rows, ensure_header
+from .csv_writer import CsvRow, append_rows
 from .errors import ImageRejectedError
+from .failures import RunContext, append_failed, summarize_exception
 from .images import (
     ImageSource,
     build_image_filename,
@@ -24,50 +23,6 @@ from .llm import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class RunContext:
-    """Per-run output paths and locks shared across worker threads."""
-
-    cfg: AppConfig
-    out_csv: Path
-    failed_csv: Path
-    failed_lock: threading.Lock = field(default_factory=threading.Lock)
-    lemma_lock: threading.Lock = field(default_factory=threading.Lock)
-    lemmas_in_progress: set[str] = field(default_factory=set)
-
-
-def ensure_failed_header(path: Path) -> None:
-    if path.exists():
-        return
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("word\treason\n", encoding="utf-8")
-
-
-def summarize_exception(exc: BaseException, max_len: int = 160) -> str:
-    """Return a short, single-line description of an exception for the failed.tsv.
-
-    Strips verbose API payloads (anything after the first `{`, where Google/OpenAI
-    error JSON typically begins) and collapses whitespace. Full traceback still
-    goes to the log via logger.exception.
-    """
-    msg = str(exc)
-    brace = msg.find("{")
-    if brace > 0:
-        msg = msg[:brace].rstrip(" .:,-")
-    msg = " ".join(msg.split())
-    summary = f"{type(exc).__name__}: {msg}" if msg else type(exc).__name__
-    if len(summary) > max_len:
-        summary = summary[: max_len - 1] + "…"
-    return summary
-
-
-def _append_failed(ctx: RunContext, word: str, reason: str) -> None:
-    safe_reason = reason.replace("\t", " ").replace("\n", " ").replace("\r", " ")
-    with ctx.failed_lock:
-        with ctx.failed_csv.open("a", encoding="utf-8") as f:
-            f.write(f"{word}\t{safe_reason}\n")
 
 
 def _fetch_image(cfg: AppConfig, word: str) -> list[tuple[str, Path]] | None:
@@ -117,7 +72,7 @@ def _fetch_image(cfg: AppConfig, word: str) -> list[tuple[str, Path]] | None:
 
 
 def process_word(raw_word: str, ctx: RunContext) -> bool:
-    """Process a single word. Resolves the lemma first, then uses it for all downstream work."""
+    """Process one personal word-list entry into Anki rows."""
     cfg = ctx.cfg
     logger.info("Processing input: %s", raw_word)
     word = raw_word
@@ -177,7 +132,7 @@ def process_word(raw_word: str, ctx: RunContext) -> bool:
 
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to process word '%s': %s", word, exc)
-        _append_failed(ctx, word, summarize_exception(exc))
+        append_failed(ctx, word, summarize_exception(exc))
         return False
     finally:
         if claimed:

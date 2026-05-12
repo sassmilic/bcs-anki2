@@ -11,10 +11,18 @@ from __future__ import annotations
 
 import logging
 import re
-import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Optional
+
+from .config import AppConfig
+from .csv_writer import CsvRow, append_rows, ensure_header
+from .dictionary_csv import read_dict_csv, subject_slug
+from .failures import RunContext, append_failed, ensure_failed_header, summarize_exception
+from .images import build_image_filename, fetch_stock_image, generate_ai_image
+from .prompts import AI_FALLBACK_PROMPT
+
+logger = logging.getLogger(__name__)
 
 _LEADING_THE = re.compile(r"^the\s+", re.IGNORECASE)
 
@@ -22,16 +30,6 @@ _LEADING_THE = re.compile(r"^the\s+", re.IGNORECASE)
 def _strip_leading_the(text: str) -> str:
     """Drop a leading 'the ' (case-insensitive). Used for queries/prompts only."""
     return _LEADING_THE.sub("", text)
-
-from .config import AppConfig
-from .csv_writer import CsvRow, append_rows, ensure_header
-from .dict_ocr import read_dict_csv, subject_slug
-from .errors import ImageRejectedError
-from .images import build_image_filename, fetch_stock_image, generate_ai_image
-from .pipeline import RunContext, _append_failed, ensure_failed_header, summarize_exception
-from .prompts import AI_FALLBACK_PROMPT
-
-logger = logging.getLogger(__name__)
 
 
 def _process_row(
@@ -85,7 +83,7 @@ def _process_row(
         return True
     except Exception as exc:  # noqa: BLE001
         logger.exception("Row failed for '%s': %s", english, exc)
-        _append_failed(ctx, english, summarize_exception(exc))
+        append_failed(ctx, english, summarize_exception(exc))
         return False
 
 

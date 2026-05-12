@@ -6,16 +6,14 @@ simple CSV with the subject on a `# Subject: ...` comment line.
 """
 from __future__ import annotations
 
-import csv
 import json
 import logging
-import re
-from dataclasses import dataclass
 from pathlib import Path
 
 from google.genai import types as genai_types
 
 from .config import AppConfig
+from .dictionary_csv import DictEntry, DictPage
 from .errors import EmptyLlmResponseError
 from .gemini import _generate_with_retry
 from .prompts import DICT_OCR_SYSTEM, DICT_OCR_USER
@@ -31,21 +29,6 @@ _MIME_BY_SUFFIX = {
     ".heic": "image/heic",
     ".heif": "image/heif",
 }
-
-
-@dataclass
-class DictEntry:
-    # `number` is a string because some entries are category headers spanning a
-    # range (e.g. "1-5") while individual rows are bare integers ("1", "2", ...).
-    number: str
-    english: str
-    serbian: str
-
-
-@dataclass
-class DictPage:
-    subject: str
-    entries: list[DictEntry]
 
 
 def _mime_for(path: Path) -> str:
@@ -126,58 +109,3 @@ def extract_dict_pages(cfg: AppConfig, image_paths: list[Path]) -> DictPage:
     page = _parse_response(text)
     logger.info("Parsed %d entries (subject: %r)", len(page.entries), page.subject)
     return page
-
-
-def subject_slug(subject: str) -> str:
-    """Filesystem-friendly slug for a subject heading.
-
-    Lowercases, collapses runs of non-word characters into a single hyphen,
-    strips edge hyphens. Preserves unicode letters (so "U šumi" → "u-šumi").
-    """
-    slug = re.sub(r"\W+", "-", subject, flags=re.UNICODE).strip("-").lower()
-    return slug or "untitled"
-
-
-def _write_csv_rows(subject: str, rows: list[tuple[str, str]], output_path: Path) -> None:
-    """Low-level writer: `# Subject: ...` line, then header, then (english, serbian) rows."""
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with output_path.open("w", encoding="utf-8", newline="") as fh:
-        fh.write(f"# Subject: {subject}\n")
-        writer = csv.writer(fh)
-        writer.writerow(["english", "serbian"])
-        for eng, sr in rows:
-            writer.writerow([eng, sr])
-
-
-def write_dict_csv(page: DictPage, output_path: Path) -> None:
-    """Write the page to a CSV: `# Subject: ...` line, then `english,serbian` rows."""
-    rows = [(e.english, e.serbian) for e in page.entries]
-    _write_csv_rows(page.subject, rows, output_path)
-
-
-def read_dict_csv(path: Path) -> tuple[str, list[tuple[str, str]]]:
-    """Inverse of write_dict_csv: parse `# Subject: ...` + (english, serbian) rows.
-
-    Returns (subject, rows). Raises ValueError on malformed input.
-    """
-    with path.open("r", encoding="utf-8", newline="") as fh:
-        first = fh.readline()
-        if not first.startswith("# Subject:"):
-            raise ValueError(f"{path}: missing `# Subject:` header on first line")
-        subject = first[len("# Subject:"):].strip()
-
-        reader = csv.reader(fh)
-        try:
-            header = next(reader)
-        except StopIteration as exc:
-            raise ValueError(f"{path}: missing CSV header row") from exc
-        if header != ["english", "serbian"]:
-            raise ValueError(f"{path}: unexpected CSV header {header!r}; expected ['english', 'serbian']")
-
-        rows: list[tuple[str, str]] = []
-        for row in reader:
-            if len(row) != 2:
-                raise ValueError(f"{path}: row has {len(row)} columns, expected 2: {row!r}")
-            rows.append((row[0], row[1]))
-
-    return subject, rows

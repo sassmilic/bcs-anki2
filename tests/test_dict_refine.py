@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from bcs_anki.dict_ocr import read_dict_csv
+from bcs_anki.dictionary_csv import read_dict_csv
 from bcs_anki.dict_refine import refine_csv, refine_rows
 
 

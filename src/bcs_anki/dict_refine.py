@@ -15,7 +15,7 @@ from pathlib import Path
 from google.genai import types as genai_types
 
 from .config import AppConfig
-from .dict_ocr import _write_csv_rows, read_dict_csv
+from .dictionary_csv import read_dict_csv, write_dict_rows
 from .errors import EmptyLlmResponseError
 from .gemini import _generate_with_retry
 from .prompts import DICT_REFINE_SYSTEM, DICT_REFINE_USER
@@ -77,5 +77,5 @@ def refine_csv(cfg: AppConfig, input_path: Path, output_path: Path) -> int:
     """Read input CSV, refine via Gemini, write to output. Returns row count written."""
     subject, rows = read_dict_csv(input_path)
     refined = refine_rows(cfg, subject, rows)
-    _write_csv_rows(subject, refined, output_path)
+    write_dict_rows(subject, refined, output_path)
     return len(refined)

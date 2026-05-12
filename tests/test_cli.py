@@ -5,7 +5,8 @@ from pathlib import Path
 from click.testing import CliRunner
 
 from bcs_anki import cli
-from bcs_anki.dict_ocr import DictEntry, DictPage
+from bcs_anki.dictionary_csv import DictEntry, DictPage
+from bcs_anki.workflows import dictionary as dictionary_workflow
 
 
 def test_top_level_help_uses_source_based_commands() -> None:
@@ -49,9 +50,9 @@ def test_dictionary_pages_runs_full_pipeline(monkeypatch, tmp_path: Path) -> Non
         calls["cards"] = (csv_path, output_csv, append)
         return 1, 0
 
-    monkeypatch.setattr(cli, "extract_dict_pages", fake_extract_dict_pages)
-    monkeypatch.setattr(cli, "refine_csv", fake_refine_csv)
-    monkeypatch.setattr(cli, "run_generate_dict", fake_run_generate_dict)
+    monkeypatch.setattr(dictionary_workflow, "extract_dict_pages", fake_extract_dict_pages)
+    monkeypatch.setattr(dictionary_workflow, "refine_csv", fake_refine_csv)
+    monkeypatch.setattr(dictionary_workflow, "run_generate_dict", fake_run_generate_dict)
 
     runner = CliRunner()
     with runner.isolated_filesystem(temp_dir=tmp_path):

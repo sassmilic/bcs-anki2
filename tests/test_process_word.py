@@ -4,9 +4,10 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from bcs_anki.pipeline import RunContext, ensure_failed_header, process_word
 from bcs_anki.csv_writer import ensure_header
+from bcs_anki.failures import RunContext, ensure_failed_header
 from bcs_anki.llm import GeneratedText
+from bcs_anki.word_cards import process_word
 
 
 def _make_ctx(cfg, tmp_path: Path) -> RunContext:
@@ -20,9 +21,9 @@ def _make_ctx(cfg, tmp_path: Path) -> RunContext:
 
 
 class TestProcessWordSuccess:
-    @patch("bcs_anki.pipeline.resolve_lemma", side_effect=lambda cfg, w: w)
-    @patch("bcs_anki.pipeline._fetch_image")
-    @patch("bcs_anki.pipeline.generate_definition_and_examples")
+    @patch("bcs_anki.word_cards.resolve_lemma", side_effect=lambda cfg, w: w)
+    @patch("bcs_anki.word_cards._fetch_image")
+    @patch("bcs_anki.word_cards.generate_definition_and_examples")
     def test_returns_true_and_writes_csv(self, mock_gen, mock_img, mock_lemma, mock_cfg, tmp_path):
         ctx = _make_ctx(mock_cfg, tmp_path)
 
@@ -41,9 +42,9 @@ class TestProcessWordSuccess:
         data_lines = [l for l in lines if not l.startswith("#")]
         assert len(data_lines) == 3
 
-    @patch("bcs_anki.pipeline.resolve_lemma", side_effect=lambda cfg, w: w)
-    @patch("bcs_anki.pipeline._fetch_image")
-    @patch("bcs_anki.pipeline.generate_definition_and_examples")
+    @patch("bcs_anki.word_cards.resolve_lemma", side_effect=lambda cfg, w: w)
+    @patch("bcs_anki.word_cards._fetch_image")
+    @patch("bcs_anki.word_cards.generate_definition_and_examples")
     def test_csv_has_correct_note_types(self, mock_gen, mock_img, mock_lemma, mock_cfg, tmp_path):
         ctx = _make_ctx(mock_cfg, tmp_path)
 
@@ -62,9 +63,9 @@ class TestProcessWordSuccess:
 
 
 class TestProcessWordFailure:
-    @patch("bcs_anki.pipeline.resolve_lemma", side_effect=lambda cfg, w: w)
-    @patch("bcs_anki.pipeline._fetch_image")
-    @patch("bcs_anki.pipeline.generate_definition_and_examples")
+    @patch("bcs_anki.word_cards.resolve_lemma", side_effect=lambda cfg, w: w)
+    @patch("bcs_anki.word_cards._fetch_image")
+    @patch("bcs_anki.word_cards.generate_definition_and_examples")
     def test_returns_false_on_error(self, mock_gen, mock_img, mock_lemma, mock_cfg, tmp_path):
         ctx = _make_ctx(mock_cfg, tmp_path)
 
