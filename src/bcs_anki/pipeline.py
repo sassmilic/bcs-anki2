@@ -22,30 +22,16 @@ from .llm import (
     generate_image_search_term,
     resolve_lemma,
 )
-from .progress import (
-    ProgressState,
-    load_progress,
-    mark_completed,
-    mark_failed,
-    progress_path_for,
-)
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class RunContext:
-    """Per-run state and locks shared across worker threads.
-
-    Bundles the output paths, the in-memory progress state, and the
-    synchronization primitives that keep concurrent workers from racing on
-    shared resources (failed.tsv writes, lemma deduplication).
-    """
+    """Per-run output paths and locks shared across worker threads."""
 
     cfg: AppConfig
-    state: ProgressState
     out_csv: Path
-    progress_file: Path
     failed_csv: Path
     failed_lock: threading.Lock = field(default_factory=threading.Lock)
     lemma_lock: threading.Lock = field(default_factory=threading.Lock)
@@ -133,7 +119,6 @@ def _fetch_image(cfg: AppConfig, word: str) -> list[tuple[str, Path]] | None:
 def process_word(raw_word: str, ctx: RunContext) -> bool:
     """Process a single word. Resolves the lemma first, then uses it for all downstream work."""
     cfg = ctx.cfg
-    state = ctx.state
     logger.info("Processing input: %s", raw_word)
     word = raw_word
 
@@ -144,8 +129,8 @@ def process_word(raw_word: str, ctx: RunContext) -> bool:
             logger.info("Resolved lemma '%s' -> '%s'", raw_word, word)
 
         with ctx.lemma_lock:
-            if word in state.completed_words or word in ctx.lemmas_in_progress:
-                logger.info("Skipping '%s': lemma already completed or in progress", word)
+            if word in ctx.lemmas_in_progress:
+                logger.info("Skipping '%s': lemma already in progress", word)
                 return True
             ctx.lemmas_in_progress.add(word)
             claimed = True
@@ -188,13 +173,11 @@ def process_word(raw_word: str, ctx: RunContext) -> bool:
             ))
 
         append_rows(ctx.out_csv, rows)
-        mark_completed(ctx.progress_file, state, word)
         return True
 
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to process word '%s': %s", word, exc)
         _append_failed(ctx, word, summarize_exception(exc))
-        mark_failed(ctx.progress_file, state, word)
         return False
     finally:
         if claimed:

@@ -29,13 +29,6 @@ from .dict_ocr import read_dict_csv, subject_slug
 from .errors import ImageRejectedError
 from .images import build_image_filename, fetch_stock_image, generate_ai_image
 from .pipeline import RunContext, _append_failed, ensure_failed_header, summarize_exception
-from .progress import (
-    ProgressState,
-    load_progress,
-    mark_completed,
-    mark_failed,
-    progress_path_for,
-)
 from .prompts import AI_FALLBACK_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -48,14 +41,11 @@ def _process_row(
     tag_str: str,
     ctx: RunContext,
 ) -> bool:
-    """Fetch/generate image for one row; write CSV row + mark progress.
+    """Fetch/generate image for one row; write CSV row.
 
     Returns True on success, False on per-row failure (still recorded; run continues).
     """
     cfg = ctx.cfg
-    # Original `english` stays the progress key (so --resume keys match the CSV
-    # rows verbatim). `query` is what we feed to stock search, AI prompt, and
-    # image filename — leading "the " is dropped to improve match quality.
     query = _strip_leading_the(english)
     img_filename = build_image_filename(query)
     img_path = cfg.temp_image_folder / img_filename
@@ -92,12 +82,10 @@ def _process_row(
             tags=tag_str,
         )
         append_rows(ctx.out_csv, [row])
-        mark_completed(ctx.progress_file, ctx.state, english)
         return True
     except Exception as exc:  # noqa: BLE001
         logger.exception("Row failed for '%s': %s", english, exc)
         _append_failed(ctx, english, summarize_exception(exc))
-        mark_failed(ctx.progress_file, ctx.state, english)
         return False
 
 
@@ -110,8 +98,6 @@ def run_generate_dict(
     csv_path: Path,
     output_csv: Optional[Path] = None,
     *,
-    resume: bool = False,
-    fresh: bool = False,
     append: bool = False,
 ) -> tuple[int, int]:
     """Process one refined dict CSV → Anki flashcards CSV.
@@ -124,7 +110,6 @@ def run_generate_dict(
     failed_csv = out.with_name(f"{out.stem}_failed.tsv")
 
     out.parent.mkdir(parents=True, exist_ok=True)
-    progress_file = progress_path_for(csv_path, out.parent)
 
     if not append and out.exists():
         out.unlink()
@@ -134,55 +119,33 @@ def run_generate_dict(
     ensure_header(out)
     ensure_failed_header(failed_csv)
 
-    state: ProgressState
-    if fresh or not resume or not progress_file.exists():
-        state = ProgressState(
-            input_file=str(csv_path),
-            total_words=len(rows),
-            completed_words=[],
-            failed_words=[],
-            last_updated="",
-        )
-    else:
-        existing = load_progress(progress_file)
-        if existing and existing.input_file == str(csv_path):
-            state = existing
-        else:
-            state = ProgressState(
-                input_file=str(csv_path),
-                total_words=len(rows),
-                completed_words=[],
-                failed_words=[],
-                last_updated="",
-            )
-
     ctx = RunContext(
         cfg=cfg,
-        state=state,
         out_csv=out,
-        progress_file=progress_file,
         failed_csv=failed_csv,
     )
     tag_str = _build_tags(cfg, slug)
 
-    completed_set = set(state.completed_words)
-    pending = [(eng, sr) for eng, sr in rows if eng not in completed_set]
-    if not pending:
-        logger.info("All %d row(s) already completed; nothing to do", len(rows))
-        return len(state.completed_words), len(state.failed_words)
+    if not rows:
+        return 0, 0
 
     logger.info(
-        "Processing %d row(s) (skipping %d already done) with %d worker(s)",
-        len(pending), len(rows) - len(pending), cfg.max_workers,
+        "Processing %d row(s) with %d worker(s)",
+        len(rows), cfg.max_workers,
     )
 
-    workers = max(1, min(cfg.max_workers, len(pending)))
+    completed = 0
+    failed = 0
+    workers = max(1, min(cfg.max_workers, len(rows)))
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = [
             pool.submit(_process_row, eng, sr, subject, tag_str, ctx)
-            for eng, sr in pending
+            for eng, sr in rows
         ]
         for f in as_completed(futures):
-            f.result()
+            if f.result():
+                completed += 1
+            else:
+                failed += 1
 
-    return len(state.completed_words), len(state.failed_words)
+    return completed, failed

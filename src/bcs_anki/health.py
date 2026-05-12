@@ -12,25 +12,54 @@ from typing import Callable
 
 import click
 import requests
-from openai import OpenAI
+from openai import APIStatusError, AuthenticationError, OpenAI, RateLimitError
 
 from .config import AppConfig
 
 logger = logging.getLogger(__name__)
 
 
+def _openai_error_message(exc: APIStatusError) -> str:
+    """Boil an APIStatusError down to a single short, actionable line.
+
+    The SDK's __str__ dumps the full JSON body, which is unreadable on a
+    terminal. We pull just the server-provided message and code.
+    """
+    code = getattr(exc, "code", None)
+    body = getattr(exc, "body", None) or {}
+    if isinstance(body, dict):
+        err = body.get("error") or {}
+        code = err.get("code") or code
+        message = err.get("message")
+    else:
+        message = None
+    message = message or getattr(exc, "message", None) or str(exc)
+    # Collapse whitespace so the message fits on one line.
+    message = " ".join(message.split())
+    return f"{code}: {message}" if code else message
+
+
 def _check_openai(cfg: AppConfig) -> None:
     if not cfg.openai_api_key:
         raise RuntimeError("OPENAI_API_KEY is not set")
-    client = OpenAI(api_key=cfg.openai_api_key)
-    # 1-token chat: validates auth, chat model, and rate-limit headroom in one call.
-    client.chat.completions.create(
-        model=cfg.llm_model,
-        messages=[{"role": "user", "content": "ping"}],
-        max_completion_tokens=64,
-    )
-    # Image model availability via models.list (free).
-    ids = {m.id for m in client.models.list().data}
+    # max_retries=0: health checks should fail fast. Retrying a quota or auth
+    # error wastes time and floods the log with retry notices.
+    client = OpenAI(api_key=cfg.openai_api_key, max_retries=0)
+    try:
+        # 1-token chat: validates auth, chat model, and rate-limit headroom in one call.
+        client.chat.completions.create(
+            model=cfg.llm_model,
+            messages=[{"role": "user", "content": "ping"}],
+            max_completion_tokens=64,
+        )
+        # Image model availability via models.list (free).
+        ids = {m.id for m in client.models.list().data}
+    except RateLimitError as exc:
+        raise RuntimeError(_openai_error_message(exc)) from None
+    except AuthenticationError as exc:
+        raise RuntimeError(_openai_error_message(exc)) from None
+    except APIStatusError as exc:
+        raise RuntimeError(_openai_error_message(exc)) from None
     if cfg.image_generation_model not in ids:
         raise RuntimeError(
             f"image model '{cfg.image_generation_model}' is not available to this account "
@@ -87,9 +116,9 @@ def _run_check(label: str, fn: Callable[[], None], errors: list[str]) -> None:
     try:
         fn()
     except Exception as exc:  # noqa: BLE001
-        click.echo(f"FAILED ({type(exc).__name__}: {exc})")
-        errors.append(f"{label}: {type(exc).__name__}: {exc}")
-        logger.exception("%s health check failed", label)
+        click.echo(f"FAILED ({exc})")
+        errors.append(f"{label}: {exc}")
+        logger.debug("%s health check failed", label, exc_info=True)
     else:
         click.echo("OK")
 

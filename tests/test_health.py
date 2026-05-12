@@ -60,6 +60,35 @@ class TestOpenAIFailure:
         with pytest.raises(RuntimeError, match="OPENAI_API_KEY is not set"):
             check_apis(no_key)
 
+    def test_rate_limit_error_is_cleaned_up(self, mock_cfg):
+        """An OpenAI RateLimitError surfaces as a short, one-line message.
+
+        The SDK's __str__ dumps the full 'Error code: 429 - {...}' body. We
+        verify the cleaned message contains the human text and code, but not
+        the noisy 'Error code:' / brace-delimited dict the SDK produces.
+        """
+        from openai import RateLimitError
+
+        client = _ok_openai_client([mock_cfg.image_generation_model])
+        body = {"error": {
+            "message": "You exceeded your current quota, please check your plan and billing details.",
+            "type": "insufficient_quota",
+            "code": "insufficient_quota",
+        }}
+        response = MagicMock()
+        response.request = MagicMock()
+        client.chat.completions.create.side_effect = RateLimitError(
+            message="Error code: 429", response=response, body=body,
+        )
+        with patch("bcs_anki.health.OpenAI", return_value=client):
+            with pytest.raises(RuntimeError) as excinfo:
+                check_apis(replace(mock_cfg, gemini_api_key=None, stock_image_api_key=None))
+        msg = str(excinfo.value)
+        assert "insufficient_quota" in msg
+        assert "exceeded your current quota" in msg
+        assert "Error code:" not in msg
+        assert "{" not in msg  # no dict dump
+
 
 class TestGeminiFailure:
     def test_gemini_call_fails(self, mock_cfg):

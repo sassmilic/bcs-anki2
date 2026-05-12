@@ -1,7 +1,6 @@
-"""Tests for the generate-dict pipeline (refined CSV → Anki Basic+reversed cards)."""
+"""Tests for the dictionary CSV card pipeline (refined CSV → Anki Basic+reversed cards)."""
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -205,39 +204,6 @@ class TestAiAlsoFailsRecordsFailedRow:
         text = failed_tsv.read_text(encoding="utf-8")
         assert "rotary motions" in text
         assert "ImageRejectedError" in text
-
-
-class TestResume:
-    def test_completed_rows_are_not_refetched(self, cards_cfg, tmp_path):
-        src = tmp_path / "geo.csv"
-        _write_csv(src, "Geografija I", [("river", "rijeka"), ("rock", "stijena")])
-
-        # Pre-populate progress as if "river" already done.
-        out_dir = cards_cfg.output_folder / "cards"
-        out_dir.mkdir(parents=True, exist_ok=True)
-        progress_file = out_dir / ".progress_geo.json"
-        progress_file.write_text(
-            json.dumps({
-                "input_file": str(src),
-                "total_words": 2,
-                "completed_words": ["river"],
-                "failed_words": [],
-                "last_updated": "",
-            }),
-            encoding="utf-8",
-        )
-
-        with patch("bcs_anki.dict_cards.fetch_stock_image", side_effect=_stock_writes_path(None)) as mock_stock, \
-             patch("bcs_anki.dict_cards.generate_ai_image"):
-            completed, failed = run_generate_dict(
-                cards_cfg, src, resume=True, append=True,
-            )
-
-        # Only "rock" should have been processed.
-        assert mock_stock.call_count == 1
-        assert mock_stock.call_args.args[1] == "rock"
-        assert completed >= 1
-        assert failed == 0
 
 
 class TestSubjectTag:
